@@ -4,17 +4,14 @@ import Control.Arrow ((***))
 import CoreFn.Binders (Binder)
 import CoreFn.Ident (Ident)
 import CoreFn.Literal (Literal)
-import CoreFn.Names (Qualified)
-import qualified Data.Text as T
-
-newtype ProperName = ProperName T.Text
-  deriving (Eq, Show)
+import CoreFn.Names (ProperName, Qualified)
+import Data.Text (Text)
 
 data Expr a
   = Literal a (Literal (Expr a))
   | Constructor a ProperName ProperName [Ident]
-  | Accessor a T.Text (Expr a)
-  | ObjectUpdate a (Expr a) [(T.Text, (Expr a))]
+  | Accessor a Text (Expr a)
+  | ObjectUpdate a (Expr a) [(Text, (Expr a))]
   | Abs a Ident (Expr a)
   | App a (Expr a) (Expr a)
   | Var a (Qualified Ident)

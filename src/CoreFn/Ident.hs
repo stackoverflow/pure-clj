@@ -1,9 +1,9 @@
 module CoreFn.Ident where
 
-import qualified Data.Text as T
+import Data.Text (Text)
 
 data Ident
-  = Ident T.Text
-  | GenIdent (Maybe T.Text) Integer
+  = Ident Text
+  | GenIdent (Maybe String) Int
   | UnusedIdent
   deriving (Eq, Ord, Show)

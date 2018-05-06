@@ -1,12 +1,12 @@
 module CoreFn.Literal where
 
-import qualified Data.Text as T
+import Data.Text (Text)
 
 data Literal a
-  = NumericLiteral (Either Integer Double)
-  | StringLiteral T.Text
+  = NumericLiteral (Either Int Double)
+  | StringLiteral Text
   | CharLiteral Char
   | BooleanLiteral Bool
   | ArrayLiteral [a]
-  | ObjectLiteral [(T.Text, a)]
+  | ObjectLiteral [(Text, a)]
   deriving (Eq, Ord, Show, Functor)

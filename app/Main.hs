@@ -1,6 +1,8 @@
 module Main where
 
-import Lib
+import CoreFn
 
 main :: IO ()
-main = someFunc
+main = do
+  contents <- readFile "test/resources/corefn_simple.json"
+  print contents

@@ -22,6 +22,10 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 - text
+- aeson
+- vector
+- hspec
+- bytestring
 
 library:
   source-dirs: src
@@ -43,7 +47,7 @@ executables:
 
 tests:
   pure-clj-test:
-    main:                Spec.hs
+    main:                Main.hs
     source-dirs:         test
     ghc-options:
     - -threaded
@@ -51,3 +55,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - pure-clj
+    - hspec
