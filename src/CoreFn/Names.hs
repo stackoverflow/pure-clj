@@ -29,3 +29,8 @@ runIdent (Ident i) = T.unpack i
 runIdent (GenIdent Nothing n) = "$" ++ show n
 runIdent (GenIdent (Just name) n) = "$" ++ name ++ show n
 runIdent UnusedIdent = error "UnusedIdent at runIdent"
+
+showQualified :: (a -> String) -> Qualified a -> String
+showQualified f (Qualified (Just mn) ident) =
+  runModuleName mn ++ "/" ++ (f ident)
+showQualified f (Qualified _ ident) = f ident

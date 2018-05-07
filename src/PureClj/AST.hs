@@ -38,24 +38,30 @@ data BinaryOperator
   | UnsignedShiftRight
   deriving (Show, Eq, Read)
 
+data KeyType
+  = KeyStr String
+  | KeyWord String
+  deriving (Show, Eq, Read)
+
 data Clj
   = CljNumericLiteral (Either Int Double)
   | CljStringLiteral String
   | CljCharLiteral Char
   | CljBooleanLiteral Bool
   | CljArrayLiteral [Clj]
-  | CljObjectLiteral [(String, Clj)]
+  | CljObjectLiteral [(KeyType, Clj)]
   | CljUnaryOperator UnaryOperator Clj
   | CljBinaryOperator BinaryOperator Clj Clj
   | CljArrayIndexer Clj Clj
-  | CljAccessor String Clj
-  | CljAccessorKeyword String Clj
+  | CljAccessor KeyType Clj
   | CljFunction (Maybe String) [String] Clj
   | CljApp Clj [Clj]
-  | CljVar String
+  | CljVar (Maybe String) String
   | CljIfElse Clj Clj (Maybe Clj)
-  | CljVarIntroduction String (Maybe Clj)
+  | CljDef String (Maybe Clj)
+  | CljLet [Clj] Clj
   | CljThrow Clj
   | CljInstanceOf Clj Clj
   | CljComment [Comment] Clj
+  | CljObjectUpdate Clj [(KeyType, Clj)]
   deriving (Show, Eq, Read)

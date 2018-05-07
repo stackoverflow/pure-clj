@@ -24,7 +24,7 @@ main = do
     toLazyStr = BL.fromStrict . B.pack
 
     toClj (Success (v, m)) = moduleToClj m
-    toClj (Error s) = [CljVar s]
+    toClj (Error s) = error $ "Failed while trying to decode json " ++ s
 
 parseModule :: Value -> Result (Version, Module Ann)
 parseModule = parse moduleFromJSON
