@@ -37,6 +37,7 @@ moduleToClj (Module coms mn path imps exps foreigns decls) =
     valToClj (Var (_, _, _, (Just (IsConstructor _ []))) name) = qualifiedToClj name
     valToClj (Var (_, _, _, (Just (IsConstructor _ _))) name) =
       CljAccessorKeyword "create" (qualifiedToClj name)
+    valToClj (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) = undefined
 
     literalToClj :: Literal (Expr Ann) -> Clj
     literalToClj (NumericLiteral (Left i)) = CljNumericLiteral (Left i)
@@ -46,9 +47,6 @@ moduleToClj (Module coms mn path imps exps foreigns decls) =
     literalToClj (BooleanLiteral b) = CljBooleanLiteral b
     literalToClj (ArrayLiteral ar) = CljArrayLiteral $ valToClj <$> ar
     literalToClj (ObjectLiteral objs) = CljObjectLiteral $ mapT T.unpack valToClj <$> objs
-
-    mapT :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
-    mapT f g = f *** g
 
     qualifiedToClj :: Qualified Ident -> Clj
     qualifiedToClj (Qualified (Just (ModuleName [ProperName mn'])) a)
@@ -60,3 +58,7 @@ moduleToClj (Module coms mn path imps exps foreigns decls) =
 isMain :: ModuleName -> Bool
 isMain (ModuleName [ProperName "Main"]) = True
 isMain _ = False
+
+-- | Maps a tuple2 with the provided functions
+mapT :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
+mapT f g = f *** g
