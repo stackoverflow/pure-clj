@@ -5,6 +5,8 @@ import PureClj.AST
 import PureClj.Common
 
 import Control.Arrow
+import Control.Monad (replicateM)
+import Control.Monad.Supply.Class
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -12,7 +14,7 @@ import qualified Data.Text as T
 nsComment :: Text
 nsComment = "Generated with pure-clj"
 
-moduleToClj :: Module Ann -> [Clj]
+moduleToClj :: Module Ann -> m [Clj]
 moduleToClj (Module coms mn path imps exps foreigns decls) =
   let namespace = CljApp (CljVar Nothing "ns") $
         [CljVar Nothing $ runModuleName mn <> ".core", CljStringLiteral nsComment]
@@ -105,7 +107,7 @@ moduleToClj (Module coms mn path imps exps foreigns decls) =
         nameF :: Text -> [Text] -> Maybe Text
         nameF name vars | name == (head vars) = Just name
         nameF _ _ = Nothing
-    valToClj _ = CljStringLiteral "Placeholder -- delete me"
+    valToClj (Case _ values binders) = bindersToClj binders $ valToClj <$> values
 
     literalToClj :: Literal (Expr Ann) -> Clj
     literalToClj (NumericLiteral (Left i)) = CljNumericLiteral (Left i)
@@ -115,6 +117,18 @@ moduleToClj (Module coms mn path imps exps foreigns decls) =
     literalToClj (BooleanLiteral b) = CljBooleanLiteral b
     literalToClj (ArrayLiteral ar) = CljArrayLiteral $ valToClj <$> ar
     literalToClj (ObjectLiteral objs) = CljObjectLiteral $ mapT KeyStr valToClj <$> objs
+
+    bindersToClj :: [CaseAlternative Ann] -> [Clj] -> m Clj
+    bindersToClj binders vals = do
+      valNames <- replicateM (length vals) freshName
+      return $ CljLet (zipWith (CljDef False) valNames (Just <$> vals)) (CljStringLiteral "")
+
+    binderToClj :: [Text] -> [Clj] -> Binder Ann -> [Clj]
+    binderToClj _ done NullBinder{} = done
+    binderToClj varName done (LiteralBinder _ l) = undefined
+
+    literalToBinderClj :: Text -> [Clj] -> Literal (Binder Ann) -> [Clj]
+    literalToBinderClj varName done (NumericLiteral num) = undefined
 
     -- | Generate a simple non-namespaced Clojure var
     var :: Ident -> Clj

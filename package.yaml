@@ -21,11 +21,14 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- base-compat >= 0.6.0
 - text
 - aeson
 - vector
 - hspec
 - bytestring
+- monad-control >= 1.0.0.0 && < 1.1
+- mtl
 
 library:
   source-dirs: src
