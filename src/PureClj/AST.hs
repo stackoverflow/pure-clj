@@ -1,5 +1,6 @@
 module PureClj.AST where
 
+import Data.Text (Text)
 import CoreFn.Ann (Comment)
 
 data UnaryOperator
@@ -39,13 +40,14 @@ data BinaryOperator
   deriving (Show, Eq, Read)
 
 data KeyType
-  = KeyStr String
-  | KeyWord String
+  = KeyStr Text
+  | KeyWord Text
   deriving (Show, Eq, Read)
 
 data Clj
   = CljNumericLiteral (Either Int Double)
-  | CljStringLiteral String
+  | CljStringLiteral Text
+  | CljKeywordLiteral Text
   | CljCharLiteral Char
   | CljBooleanLiteral Bool
   | CljArrayLiteral [Clj]
@@ -54,11 +56,11 @@ data Clj
   | CljBinaryOperator BinaryOperator Clj Clj
   | CljArrayIndexer Clj Clj
   | CljAccessor KeyType Clj
-  | CljFunction (Maybe String) [String] Clj
+  | CljFunction (Maybe Text) [Text] Clj
   | CljApp Clj [Clj]
-  | CljVar (Maybe String) String
+  | CljVar (Maybe Text) Text
   | CljIfElse Clj Clj (Maybe Clj)
-  | CljDef String (Maybe Clj)
+  | CljDef Bool Text (Maybe Clj)
   | CljLet [Clj] Clj
   | CljThrow Clj
   | CljInstanceOf Clj Clj

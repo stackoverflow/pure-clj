@@ -3,19 +3,24 @@ module PureClj.Common where
 import CoreFn.Ident
 
 import Data.Char
+import Data.Monoid ((<>))
+import Data.Text (Text)
 import qualified Data.Text as T
 
-identToClj :: Ident -> String
-identToClj (Ident ident) = case T.unpack ident of
-  name | isNameReserved name || isBuiltIn name -> "!!" ++ name
-  name -> concatMap identCharToString name
+identToClj :: Ident -> Text
+identToClj (Ident ident) = properToClj ident
 identToClj (GenIdent _ _) = error "GenIdent in identToClj"
-identToClj UnusedIdent = error "UnusedIdent in identToClj"
+identToClj UnusedIdent = "!__unused"
+
+properToClj :: Text -> Text
+properToClj name
+  | isNameReserved name || isBuiltIn name = "!!" <> name
+  | otherwise = T.concatMap identCharToText name
 
 -- | Clojurizes an operator
-identCharToString :: Char -> String
-identCharToString c = case c of
-  ch | isAlphaNum ch -> [ch]
+identCharToText :: Char -> Text
+identCharToText c = case c of
+  ch | isAlphaNum ch -> T.singleton ch
   '_' -> "_"
   '.' -> "!dot"
   '$' -> "!dollar"
@@ -38,13 +43,13 @@ identCharToString c = case c of
   '?' -> "?"
   '@' -> "!at"
   '\'' -> "*"
-  ch -> '!' : show (ord ch)
+  ch -> '!' `T.cons` T.pack (show (ord ch))
 
 -- | Checks whether a name is reserved in Clojure
-isNameReserved :: String -> Bool
+isNameReserved :: Text -> Bool
 isNameReserved n = n `elem` cljReserved
 
-cljReserved :: [String]
+cljReserved :: [Text]
 cljReserved =
   [ "def"
   , "if"
@@ -63,7 +68,7 @@ cljReserved =
   ]
 
 -- | Checks if a name exists in Clojure
-isBuiltIn :: String -> Bool
+isBuiltIn :: Text -> Bool
 isBuiltIn name =
   isBuiltInOp name || elem name
   [ "defn"
@@ -92,7 +97,7 @@ isBuiltIn name =
   ]
 
 -- | Checks if an operator exists in Clojure
-isBuiltInOp :: String -> Bool
+isBuiltInOp :: Text -> Bool
 isBuiltInOp op = elem op
   [ "="
   , "=="

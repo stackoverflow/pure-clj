@@ -4,6 +4,6 @@ import Data.Text (Text)
 
 data Ident
   = Ident Text
-  | GenIdent (Maybe String) Int
+  | GenIdent (Maybe Text) Int
   | UnusedIdent
   deriving (Eq, Ord, Show)
