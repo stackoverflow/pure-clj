@@ -12,18 +12,24 @@ import Data.Aeson.Types
 import Data.Version
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as B
+import Control.Monad.Supply
+import Control.Monad.Supply.Class
 
 main :: IO ()
 main = do
   contents <- readFile "test/resources/corefn_simple.json"
   let parsed = decode $ toLazyStr contents :: Maybe Value
   case parsed of
-    Just js -> print $ toClj $ parseModule js
+    Just js -> do
+      let res = parseModule js
+      let res' = evalSupply 0 $ toClj res
+      print res'
     Nothing -> print "nope"
   where
     toLazyStr = BL.fromStrict . B.pack
 
-    toClj (Success (v, m)) = moduleToClj m
+    toClj :: (Monad m, MonadSupply m) => Result (a, Module Ann) -> m [Clj]
+    toClj (Success (_, m)) = moduleToClj m
     toClj (Error s) = error $ "Failed while trying to decode json " ++ s
 
 parseModule :: Value -> Result (Version, Module Ann)

@@ -20,15 +20,16 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/pure-clj#readme>
 
 dependencies:
-- base >= 4.7 && < 5
-- base-compat >= 0.6.0
-- text
-- aeson
-- vector
-- hspec
-- bytestring
-- monad-control >= 1.0.0.0 && < 1.1
-- mtl
+  - aeson
+  - base >= 4.7 && < 5
+  - base-compat >= 0.6.0
+  - bytestring
+  - hspec
+  - monad-control >= 1.0.0.0 && < 1.1
+  - mtl
+  - text
+  - transformers
+  - vector
 
 library:
   source-dirs: src
@@ -36,6 +37,8 @@ library:
   default-extensions:
     - DeriveFunctor
     - OverloadedStrings
+    - RankNTypes
+    - ScopedTypeVariables
 
 executables:
   pure-clj-exe:
