@@ -16,14 +16,16 @@ nsComment = "Generated with pure-clj"
 
 moduleToClj :: forall m. (Monad m, MonadSupply m) => Module Ann -> m [Clj]
 moduleToClj (Module coms mn path imps exps foreigns decls) = do
-  let namespace = CljApp (CljVar Nothing "ns") $
-        [CljVar Nothing $ runModuleName mn <> ".core", CljStringLiteral nsComment]
-      imports = importToClj <$> imps
+  let imports = importToClj <$> imps
+      namespace = CljApp (CljVar Nothing "ns") $
+        [ CljVar Nothing $ runModuleName mn <> ".core", CljStringLiteral nsComment
+        , CljApp (CljKeywordLiteral "require") imports
+        ]
   definitions <- bindToClj True `mapM` decls
-  return $ namespace : imports ++ (concat definitions)
+  return $ namespace : (concat definitions)
   where
     importToClj :: (Ann, ModuleName) -> Clj
-    importToClj (_,  mn') = CljRequire (name <> ".core") (Just name)
+    importToClj (_,  mn') = CljRequire (name <> ".core") name
       where
         name = runModuleName mn'
 
@@ -47,7 +49,7 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
       return $ CljAccessor (KeyWord "create") (qualifiedToClj name)
     valToClj (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
       return $ if mn == mn'
-               then foreignIdent ident
+               then CljVar Nothing $ identToClj ident
                else varToClj qi
     valToClj (Var (_, _, _, Just IsForeign) ident) =
       error $ T.unpack $ "Encountered a unqualified reference to a foreign ident " <> (showQualified runIdent ident)
@@ -134,7 +136,16 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
     bindersToClj :: [CaseAlternative Ann] -> [Clj] -> m Clj
     bindersToClj binders vals = do
       valNames <- replicateM (length vals) freshName
-      return $ CljLet (zipWith (CljDef False) valNames (Just <$> vals)) (CljStringLiteral "")
+      return $ CljLet (zipWith (CljDef False) valNames (Just <$> vals)) (CljArrayLiteral [])
+      where
+        guardToClj :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> Clj -> m [Clj]
+        guardToClj (Left gs) next = traverse genGuard gs
+          where
+            genGuard (cond, val) = do
+              cond' <- valToClj cond
+              val' <- valToClj val
+              return $ CljIfElse cond' val' (Just next)
+        guardToClj (Right v) next = return [next]
 
     binderToClj :: [Text] -> [Clj] -> Binder Ann -> m [Clj]
     binderToClj _ done NullBinder{} = return done
@@ -157,9 +168,6 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
     qualifiedToClj (Qualified (Just mn') a)
       | mn /= mn' = CljVar (Just $ runModuleName mn') (identToClj a)
     qualifiedToClj (Qualified _ a) = CljVar Nothing $ identToClj a
-
-    foreignIdent :: Ident -> Clj
-    foreignIdent ident = CljVar (Just "$foreign") (runIdent ident)
 
 isMain :: ModuleName -> Bool
 isMain (ModuleName [ProperName "Main"]) = True

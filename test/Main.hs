@@ -6,12 +6,14 @@ import CoreFn
 import CoreFn.FromJSON
 import PureClj.AST
 import PureClj.CodeGen
+import PureClj.Printer (prettyPrintClj)
 
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Version
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as B
+import qualified Data.Text.IO as TIO
 import Control.Monad.Supply
 import Control.Monad.Supply.Class
 
@@ -23,7 +25,8 @@ main = do
     Just js -> do
       let res = parseModule js
       let res' = evalSupply 0 $ toClj res
-      print res'
+      putStrLn ""
+      TIO.putStrLn $ prettyPrintClj res'
     Nothing -> print "nope"
   where
     toLazyStr = BL.fromStrict . B.pack

@@ -33,10 +33,8 @@ data BinaryOperator
   | Or
   | BitAnd
   | BitOr
-  | BitXor
   | ShiftLeft
   | ShiftRight
-  | UnsignedShiftRight
   deriving (Show, Eq, Read)
 
 data KeyType
@@ -62,9 +60,9 @@ data Clj
   | CljIfElse Clj Clj (Maybe Clj)
   | CljDef Bool Text (Maybe Clj)
   | CljLet [Clj] Clj
-  | CljThrow Clj
-  | CljInstanceOf Clj Clj
-  | CljComment [Comment] Clj
+  -- | CljThrow Clj
+  -- | CljInstanceOf Clj Clj
+  -- | CljComment [Comment] Clj
   | CljObjectUpdate Clj [(KeyType, Clj)]
-  | CljRequire Text (Maybe Text)
+  | CljRequire Text Text
   deriving (Show, Eq, Read)
