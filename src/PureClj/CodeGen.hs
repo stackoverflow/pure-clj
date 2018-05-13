@@ -11,6 +11,8 @@ import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 
+import System.IO.Unsafe (unsafePerformIO)
+
 nsComment :: Text
 nsComment = "Generated with pure-clj"
 
@@ -107,14 +109,14 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
                     [(KeyWord "create", CljVar Nothing "create")]
           body = CljObjectUpdate (CljVar Nothing "m") $
                  (KeyWord "create", CljVar Nothing "create") : [(KeyWord v, CljVar Nothing v) | v <- vars]
-          createFn = foldr (\f inner -> CljFunction (nameF "create" vars) [f] inner) body vars
+          createFn = foldr (\f inner -> CljFunction (nameCtorF "create" f) [f] inner) body vars
       in return $ CljFunction Nothing [] $
                     CljLet [CljDef False "m" $ Just obj,
                             CljDef False "create" $ Just createFn] letBody
       where
-        nameF :: Text -> [Text] -> Maybe Text
-        nameF name vars | name == (head vars) = Just name
-        nameF _ _ = Nothing
+        nameCtorF :: Text -> Text -> Maybe Text
+        nameCtorF name var' | "value0" == var' = Just name
+        nameCtorF _ _ = Nothing
     valToClj (Case _ values binders) = do
       vals <- mapM valToClj values
       bindersToClj binders vals

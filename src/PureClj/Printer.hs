@@ -125,8 +125,8 @@ literals = mkPattern' match
       , maybe mzero (\req' -> prettyPrintClj' req') req
       ]
     match (CljFunction mname args ret) = mconcat <$> sequence
-      [ return $ emit "(fn"
-      , return $ emit $ (fromMaybe "" mname) <> " "
+      [ return $ emit "(fn "
+      , return $ emit $ (maybe "" (\name -> name <> " ") mname)
       , return $ emit $ "[" <> (intercalate " " args) <> "]\n"
       , withIndent $ do
           ret' <- prettyPrintClj' ret
