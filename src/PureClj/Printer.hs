@@ -57,33 +57,42 @@ literals = mkPattern' match
       ]
     match (CljObjectLiteral []) = return $ emit "{}"
     match (CljObjectLiteral ps) = mconcat <$> sequence
-      [ return $ emit "{"
+      [ return $ emit "{\n"
       , withIndent $ do
           entries <- forM ps $ \(key, value) -> fmap ((keyToStr key <> emit " ") <>) . prettyPrintClj' $ value
           indentString <- currentIndent
-          return $ intercalate (emit ",\n") $ map (indentString <>) entries
-      , return $ emit "}"
+          return $ intercalate (emit ",\n") $ map (indentString <>) (entries <> [emit "}"])
       ]
     match (CljVar (Just mn) name) = return $ emit mn <> emit "/" <> emit name
     match (CljVar Nothing name) = return $ emit name
     match (CljDef True ident val) = mconcat <$> sequence
-      [ return $ emit $ "(def " <> ident
-      , maybe (return mempty) (fmap (emit " " <>) . prettyPrintClj') val
+      [ return $ emit $ "(def " <> ident <> "\n"
+      , maybe (return mempty) identVal val
       , return $ emit ")"
       ]
+      where
+        identVal :: (Emit gen) => Clj -> StateT PrinterState Maybe gen
+        identVal clj = withIndent $ do
+          clj' <- prettyPrintClj' clj
+          indent' <- currentIndent
+          return $ indent' <> clj'
+
     match (CljDef False ident (Just val)) = mconcat <$> sequence
       [ return $ emit (ident <> " ")
       , prettyPrintClj' val
       ]
     match (CljLet [] ret) = prettyPrintClj' ret
     match (CljLet binds ret) = mconcat <$> sequence
-      [ return $ emit "(let [\n"
+      [ return $ emit "(let\n"
       , withIndent $ do
           entries <- forM binds $ \bind -> prettyPrintClj' bind
-          identString <- currentIndent
-          return $ intercalate (emit "\n") $ map (identString <>) entries
+          ind <- currentIndent
+          return $ ind <> emit "[" <> (intercalate (emit "\n" <> ind <> emit " ") entries)
       , return $ emit "]\n"
-      , prettyPrintClj' ret
+      , withIndent $ do
+          ret' <- prettyPrintClj' ret
+          identString <- currentIndent
+          return $ identString <> ret'
       , return $ emit ")"
       ]
     match (CljIfElse cond th el) = mconcat <$> sequence
@@ -110,6 +119,21 @@ literals = mkPattern' match
       , return $ emit ")"
       ]
     match (CljRequire m as) = return $ emit ("[" <> m <> " :as " <> as <> "]")
+    match (CljNamespace ns comm req) = mconcat <$> sequence
+      [ return $ emit $ "(ns " <> ns
+      , return $ emit (maybe " " (\cm -> "\n  \"" <> cm <> "\"\n  ") comm)
+      , maybe mzero (\req' -> prettyPrintClj' req') req
+      ]
+    match (CljFunction mname args ret) = mconcat <$> sequence
+      [ return $ emit "(fn"
+      , return $ emit $ (fromMaybe "" mname) <> " "
+      , return $ emit $ "[" <> (intercalate " " args) <> "]\n"
+      , withIndent $ do
+          ret' <- prettyPrintClj' ret
+          indentString <- currentIndent
+          return $ indentString <> ret'
+      , return $ emit ")"
+      ]
     match _ = mzero
 
 accessor :: Pattern PrinterState Clj (Text, Clj)
@@ -139,12 +163,6 @@ app = mkPattern' match
     return (intercalate (emit " ") jss, CljVar Nothing "-")
   match _ = mzero
 
-lam :: Pattern PrinterState Clj ((Maybe Text, [Text]), Clj)
-lam = mkPattern match
-  where
-  match (CljFunction name args ret) = Just ((name, args), ret)
-  match _ = Nothing
-
 binary :: (Emit gen) => BinaryOperator -> Text -> Operator PrinterState Clj gen
 binary op str = AssocL match (\v1 v2 -> emit "(" <> emit str <> sp <> v1 <> sp <> v2 <> emit ")")
   where
@@ -160,7 +178,7 @@ prettyStatements :: (Emit gen) => [Clj] -> StateT PrinterState Maybe gen
 prettyStatements sts = do
   cljs <- forM sts prettyPrintClj'
   indentString <- currentIndent
-  return $ intercalate (emit "\n") $ map (indentString <>) cljs
+  return $ intercalate (emit "\n\n") $ map (indentString <>) cljs
 
 prettyPrintClj :: [Clj] -> Text
 prettyPrintClj = maybe (error "Incomplete pattern") runPlainString . flip evalStateT (PrinterState 0) . prettyStatements
@@ -179,10 +197,6 @@ prettyPrintClj' = A.runKleisli $ runPattern matchValue
                           emit "(nth " <> val <> sp <> index <> emit ")" ]
                     , [ Wrap app $ \args val ->
                           emit "(" <> val <> sp <> args <> emit ")" ]
-                    , [ Wrap lam $ \(name, args) ret ->
-                          emit ("(fn " <> fromMaybe "" name
-                                       <> "[" <> intercalate " " args <> "] ")
-                               <> ret ]
                     , [ binary Add "+" ]
                     , [ binary Subtract "-" ]
                     , [ binary Multiply "*" ]
@@ -207,4 +221,4 @@ prettyPrintClj' = A.runKleisli $ runPattern matchValue
 
 keyToStr :: (Emit gen) => KeyType -> gen
 keyToStr (KeyStr s) = emit $ prettyPrintString s
-keyToStr (KeyWord k) = emit $ prettyPrintString $ ":" <> k
+keyToStr (KeyWord k) = emit $ prettyPrintSymbol $ ":" <> k

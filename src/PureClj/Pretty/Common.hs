@@ -117,7 +117,7 @@ emptyPrinterState = PrinterState { indent = 0 }
 -- Number of characters per identation level
 --
 blockIndent :: Int
-blockIndent = 4
+blockIndent = 2
 
 -- |
 -- Pretty print with a new indentation level
@@ -145,13 +145,6 @@ prettyPrintMany f xs = do
   ss <- mapM f xs
   indentString <- currentIndent
   return $ intercalate (emit "\n") $ map (mappend indentString) ss
-
-{-objectKeyRequiresQuoting :: Text -> Bool
-objectKeyRequiresQuoting s =
-  s `elem` reservedPsNames || not (isUnquotedKey s) || startsUppercase s where
-    startsUppercase label = case T.uncons label of
-      Just (c, _) -> isUpper c
-      _ -> False-}
 
 -- | Place a box before another, vertically when the first box takes up multiple lines.
 before :: Box -> Box -> Box

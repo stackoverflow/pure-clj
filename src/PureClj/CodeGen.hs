@@ -17,10 +17,8 @@ nsComment = "Generated with pure-clj"
 moduleToClj :: forall m. (Monad m, MonadSupply m) => Module Ann -> m [Clj]
 moduleToClj (Module coms mn path imps exps foreigns decls) = do
   let imports = importToClj <$> imps
-      namespace = CljApp (CljVar Nothing "ns") $
-        [ CljVar Nothing $ runModuleName mn <> ".core", CljStringLiteral nsComment
-        , CljApp (CljKeywordLiteral "require") imports
-        ]
+      namespace = CljNamespace (runModuleName mn <> ".core") (Just nsComment) $
+                  (Just $ CljApp (CljKeywordLiteral "require") imports)
   definitions <- bindToClj True `mapM` decls
   return $ namespace : (concat definitions)
   where

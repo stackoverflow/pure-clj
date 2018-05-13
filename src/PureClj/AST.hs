@@ -65,4 +65,5 @@ data Clj
   -- | CljComment [Comment] Clj
   | CljObjectUpdate Clj [(KeyType, Clj)]
   | CljRequire Text Text
+  | CljNamespace Text (Maybe Text) (Maybe Clj)
   deriving (Show, Eq, Read)

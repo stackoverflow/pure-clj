@@ -19,7 +19,8 @@ import Control.Monad.Supply.Class
 
 main :: IO ()
 main = do
-  contents <- readFile "test/resources/corefn_simple.json"
+  --contents <- readFile "test/resources/corefn_simple.json"
+  contents <- readFile "/home/islon/dev/repos/puretest/output/Main/corefn.json"
   let parsed = decode $ toLazyStr contents :: Maybe Value
   case parsed of
     Just js -> do
