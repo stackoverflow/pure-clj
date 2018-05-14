@@ -65,9 +65,10 @@ literals = mkPattern' match
       ]
     match (CljVar (Just mn) name) = return $ emit mn <> emit "/" <> emit name
     match (CljVar Nothing name) = return $ emit name
-    match (CljDef True ident val) = mconcat <$> sequence
+    match (CljDef True ident Nothing) = return $ emit ("(declare " <> ident <> ")")
+    match (CljDef True ident (Just val)) = mconcat <$> sequence
       [ return $ emit $ "(def " <> ident <> "\n"
-      , maybe (return mempty) identVal val
+      , identVal val
       , return $ emit ")"
       ]
       where

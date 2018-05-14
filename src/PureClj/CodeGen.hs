@@ -11,23 +11,34 @@ import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import System.IO.Unsafe (unsafePerformIO)
-
 nsComment :: Text
 nsComment = "Generated with pure-clj"
 
 moduleToClj :: forall m. (Monad m, MonadSupply m) => Module Ann -> m [Clj]
 moduleToClj (Module coms mn path imps exps foreigns decls) = do
-  let imports = importToClj <$> imps
+  let imports = importToClj <$> (filter shouldImport imps)
       namespace = CljNamespace (runModuleName mn <> ".core") (Just nsComment) $
                   (Just $ CljApp (CljKeywordLiteral "require") imports)
+      declares = makeDeclares decls
   definitions <- bindToClj True `mapM` decls
-  return $ namespace : (concat definitions)
+  return $ namespace : declares ++ (concat definitions)
   where
+    shouldImport :: (Ann, ModuleName) -> Bool
+    shouldImport (_, mn') = mn' /= mn && mn' /= ModuleName [ProperName "Prim"]
+
     importToClj :: (Ann, ModuleName) -> Clj
     importToClj (_,  mn') = CljRequire (name <> ".core") name
       where
         name = runModuleName mn'
+
+    makeDeclares :: [Bind Ann] -> [Clj]
+    makeDeclares binds = concatMap declare binds
+      where
+        declare :: Bind Ann -> [Clj]
+        declare (NonRec _ ident _) = def ident
+        declare (Rec vals) = concatMap def (snd . fst <$> vals)
+
+        def ident = [CljDef True (identToClj ident) Nothing]
 
     bindToClj :: Bool -> Bind Ann -> m [Clj]
     bindToClj isTopLv (NonRec ann ident val) = return <$> exprToClj isTopLv (ann, ident) val
