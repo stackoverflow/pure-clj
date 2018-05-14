@@ -147,16 +147,19 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
     bindersToClj :: [CaseAlternative Ann] -> [Clj] -> m Clj
     bindersToClj binders vals = do
       valNames <- replicateM (length vals) freshName
-      return $ CljLet (zipWith (CljDef False) valNames (Just <$> vals)) (CljArrayLiteral [])
+      let letFn = CljLet (zipWith (CljDef False) valNames (Just <$> vals))
+      cljs <- forM binders $ \(CaseAlternative bs res) -> do
+        ret <- guardToClj res
+        binds <- forM bs $ binderToClj valNames ret
+        return $ concat binds
+      return $ letFn $ CljCond [] Nothing
       where
-        guardToClj :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> Clj -> m [Clj]
-        guardToClj (Left gs) next = traverse genGuard gs
-          where
-            genGuard (cond, val) = do
-              cond' <- valToClj cond
-              val' <- valToClj val
-              return $ CljIfElse cond' val' (Just next)
-        guardToClj (Right v) next = return [next]
+        guardToClj :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [Clj]
+        guardToClj (Left gs) = error "Not yet implemented"
+        guardToClj (Right v) = valToClj v >>= (\v' -> return [v'])
+
+    condToClj :: Binder Ann -> Clj
+    condToClj NullBinder{} = CljBooleanLiteral True
 
     binderToClj :: [Text] -> [Clj] -> Binder Ann -> m [Clj]
     binderToClj _ done NullBinder{} = return done

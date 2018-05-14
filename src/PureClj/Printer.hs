@@ -96,19 +96,19 @@ literals = mkPattern' match
           return $ identString <> ret'
       , return $ emit ")"
       ]
-    match (CljIfElse cond th el) = mconcat <$> sequence
-      [ return $ emit "(if "
-      , prettyPrintClj' cond
-      , printThenElse th
-      , maybe (return mempty) printThenElse el
+    match (CljCond conds el) = mconcat <$> sequence
+      [ return $ emit "(cond\n"
+      , intercalate (emit "\n") <$> forM conds printCond
+      , maybe (return mempty) (\el' -> printCond (CljKeywordLiteral ":else", el')) el
       , return $ emit ")"
       ]
       where
-        printThenElse :: (Emit gen) => Clj -> StateT PrinterState Maybe gen
-        printThenElse els = withIndent $ do
-          el' <- prettyPrintClj' els
+        printCond :: (Emit gen) => (Clj, Clj) -> StateT PrinterState Maybe gen
+        printCond (check, val) = withIndent $ do
+          check' <- prettyPrintClj' check
+          val' <- prettyPrintClj' val
           identString <- currentIndent
-          return $ identString <> el'
+          return $ identString <> check' <> emit " " <> val'
     match (CljObjectUpdate m keyvals) = mconcat <$> sequence
       [ return $ emit "(assoc "
       , prettyPrintClj' m
@@ -179,7 +179,7 @@ prettyStatements :: (Emit gen) => [Clj] -> StateT PrinterState Maybe gen
 prettyStatements sts = do
   cljs <- forM sts prettyPrintClj'
   indentString <- currentIndent
-  return $ intercalate (emit "\n\n") $ map (indentString <>) cljs
+  return $ intercalate (emit "\n") $ map (indentString <>) cljs
 
 prettyPrintClj :: [Clj] -> Text
 prettyPrintClj = maybe (error "Incomplete pattern") runPlainString . flip evalStateT (PrinterState 0) . prettyStatements

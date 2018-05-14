@@ -57,7 +57,7 @@ data Clj
   | CljFunction (Maybe Text) [Text] Clj
   | CljApp Clj [Clj]
   | CljVar (Maybe Text) Text
-  | CljIfElse Clj Clj (Maybe Clj)
+  | CljCond [(Clj, Clj)] (Maybe Clj)
   | CljDef Bool Text (Maybe Clj)
   | CljLet [Clj] Clj
   -- | CljThrow Clj
