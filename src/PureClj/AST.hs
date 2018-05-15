@@ -53,7 +53,7 @@ data Clj
   | CljArrayLiteral [Clj]
   | CljObjectLiteral [(KeyType, Clj)]
   | CljUnary UnaryOperator Clj
-  | CljBinary BinaryOperator Clj Clj
+  | CljBinary BinaryOperator [Clj]
   | CljArrayIndexer Clj Clj
   | CljAccessor KeyType Clj
   | CljFunction (Maybe Text) [Text] Clj
@@ -61,9 +61,8 @@ data Clj
   | CljVar (Maybe Text) Text
   | CljCond [(Clj, Clj)] (Maybe Clj)
   | CljDef Bool Text (Maybe Clj)
-  | CljLet [Clj] Clj
-  -- | CljThrow Clj
-  -- | CljInstanceOf Clj Clj
+  | CljLet [Clj] [Clj]
+  | CljThrow Clj
   -- | CljComment [Comment] Clj
   | CljObjectUpdate Clj [(KeyType, Clj)]
   | CljRequire Text Text

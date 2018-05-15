@@ -7,7 +7,7 @@ import PureClj.AST
 import PureClj.Common
 
 import Control.Arrow
-import Control.Monad (replicateM, forM)
+import Control.Monad (replicateM, forM, zipWithM)
 import Control.Monad.Supply.Class
 import Data.Monoid ((<>))
 import Data.Text (Text)
@@ -57,9 +57,9 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
 
     valToClj :: Expr Ann -> m Clj
     valToClj (Literal _ expr) = literalToClj expr
-    valToClj (Var (_, _, _, (Just (IsConstructor _ []))) name) = return $ qualifiedToClj name
+    valToClj (Var (_, _, _, (Just (IsConstructor _ []))) name) = return $ qualifiedToClj id name
     valToClj (Var (_, _, _, (Just (IsConstructor _ _))) name) =
-      return $ CljAccessor (KeyWord "create") (qualifiedToClj name)
+      return $ CljAccessor (KeyWord "create") (qualifiedToClj id name)
     valToClj (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
       return $ if mn == mn'
                then CljVar Nothing $ identToClj ident
@@ -96,9 +96,9 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
       case f of
         Var (_, _, _, Just IsNewtype) _ -> return $ head args'
         Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
-          return $ CljApp (CljAccessor (KeyWord "create") (qualifiedToClj name)) args'
+          return $ CljApp (CljAccessor (KeyWord "create") (qualifiedToClj id name)) args'
         Var (_, _, _, Just IsTypeClassConstructor) name ->
-          return $ CljApp (qualifiedToClj name) args'
+          return $ CljApp (qualifiedToClj id name) args'
         _ -> flip (foldl (\fn a -> CljApp fn [a])) args' <$> valToClj f
       where
         unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
@@ -107,7 +107,7 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
     valToClj (Let _ bs val) = do
       ret <- valToClj val
       binds <- mapM (bindToClj False) bs
-      return $ CljLet (concat binds) ret
+      return $ CljLet (concat binds) [ret]
     valToClj (Constructor (_, _, _, Just IsNewtype) _ (ProperName ctor) _) =
       return $ CljDef False (properToClj ctor) (Just $
                  CljObjectLiteral [(KeyWord "create",
@@ -125,7 +125,7 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
           createFn = foldr (\f inner -> CljFunction (nameCtorF "create" f) [f] inner) body vars
       in return $ CljFunction Nothing [] $
                     CljLet [CljDef False "m" $ Just obj,
-                            CljDef False "create" $ Just createFn] letBody
+                            CljDef False "create" $ Just createFn] [letBody]
       where
         nameCtorF :: Text -> Text -> Maybe Text
         nameCtorF name var' | "value0" == var' = Just name
@@ -150,37 +150,75 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
     bindersToClj binders vals = do
       valNames <- replicateM (length vals) freshName
       let letFn = CljLet (zipWith (CljDef False) valNames (Just <$> vals))
+          throw = CljThrow $ CljApp (CljVar Nothing "ex-info")
+            [ CljStringLiteral "Exhausted pattern matching"
+            , CljObjectLiteral []]
       cljs <- forM binders $ \(CaseAlternative bs res) -> do
         ret <- guardToClj res
-        let conds = condToClj <$> bs
-        binds <- forM bs $ binderToClj valNames ret
-        return $ concat binds
-      return $ letFn $ CljCond [] Nothing
+        binds <- zipWithM binderToClj valNames bs
+        let allConds = zipWith condToClj valNames bs
+            conds' = filter notTrue allConds
+            conds = if null conds' then CljBooleanLiteral True else CljBinary And conds'
+            lets = CljLet (concat binds) ret
+        return (conds, lets)
+      return $ letFn [CljCond cljs (Just throw)]
       where
+        notTrue :: Clj -> Bool
+        notTrue (CljBooleanLiteral True) = False
+        notTrue _ = True
+
         guardToClj :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [Clj]
         guardToClj (Left gs) = error "Not yet implemented"
         guardToClj (Right v) = valToClj v >>= (\v' -> return [v'])
 
-    condToClj :: Binder Ann -> Clj
-    condToClj NullBinder{} = CljBooleanLiteral True
-    condToClj (LiteralBinder _ l) = undefined
+    binderToClj :: Text -> Binder Ann -> m [Clj]
+    binderToClj _ NullBinder{} = return []
+    binderToClj _ LiteralBinder{} = return []
+    binderToClj varName (VarBinder _ ident) =
+      return [letDef (identToClj ident) $ CljVar Nothing varName]
+    binderToClj varName (NamedBinder _ ident binder) = do
+      inner <- binderToClj varName binder
+      return $ (letDef (identToClj ident) $ CljVar Nothing varName) : inner
+    binderToClj varName (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [binder]) =
+      binderToClj varName binder
+    binderToClj varName (ConstructorBinder (_, _, _, Just (IsConstructor ct fields)) _ _ bs) = do
+      -- | FIXME: check constructor type
+      let varCtor = CljVar Nothing varName
+      defs <- zipWithM (go varCtor) fields bs
+      return $ concat defs
+      where
+        go :: Clj -> Ident -> Binder Ann -> m [Clj]
+        go ctorVar ident bind = do
+          argVar <- freshName
+          clj <- binderToClj argVar bind
+          let argClj = letDef argVar (CljAccessor (KeyWord . runIdent $ ident) ctorVar)
+          return $ argClj : clj
+    binderToClj _ ConstructorBinder{} = error "binderToClj: invalid ConstructorBinder"
 
-    binderToClj :: [Text] -> [Clj] -> Binder Ann -> m [Clj]
-    binderToClj _ done NullBinder{} = return done
-    binderToClj varName done (LiteralBinder _ l) = undefined
-
-    literalToBinderClj :: Text -> [Clj] -> Literal (Binder Ann) -> [Clj]
-    literalToBinderClj varName done (NumericLiteral num) = undefined
+    condToClj :: Text -> Binder Ann -> Clj
+    condToClj _ NullBinder{} = CljBooleanLiteral True
+    condToClj _ VarBinder{} = CljBooleanLiteral True
+    condToClj val (LiteralBinder _ l) = literalCondToClj val l
+    condToClj val (NamedBinder _ _ binder) = condToClj val binder
+    condToClj val (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [binder]) =
+      condToClj val binder
+    condToClj val (ConstructorBinder (_, _, _, Just (IsConstructor _ _)) _ ctor _) =
+      CljBinary Equal [ accessType (var' val)
+                      , accessType (qualifiedToClj (Ident . runProperName) ctor)]
+      where
+        accessType :: Clj -> Clj
+        accessType value = CljAccessor (KeyWord "type") value
+    condToClj _ ConstructorBinder{} = error "condToClj: invalid ConstructorBinder"
 
     literalCondToClj :: Text -> Literal (Binder Ann) -> Clj
     literalCondToClj varName (NumericLiteral n) =
-      CljBinary Equal (CljNumericLiteral n) (CljVar Nothing varName)
+      CljBinary Equal [(CljNumericLiteral n), (var' varName)]
     literalCondToClj varName (StringLiteral s) =
-      CljBinary Equal (CljStringLiteral s) (CljVar Nothing varName)
+      CljBinary Equal [(CljStringLiteral s), (var' varName)]
     literalCondToClj varName (CharLiteral c) =
-      CljBinary Equal (CljCharLiteral c) (CljVar Nothing varName)
+      CljBinary Equal [(CljCharLiteral c), (var' varName)]
     literalCondToClj varName (BooleanLiteral b) =
-      CljBinary Equal (CljBooleanLiteral b) (CljVar Nothing varName)
+      CljBinary Equal [(CljBooleanLiteral b), (var' varName)]
     literalCondToClj varName (ArrayLiteral arr) = undefined
     literalCondToClj varName (ObjectLiteral obj) = undefined
 
@@ -188,16 +226,22 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
     var :: Ident -> Clj
     var = CljVar Nothing . identToClj
 
+    var' :: Text -> Clj
+    var' name = CljVar Nothing name
+
     varToClj :: Qualified Ident -> Clj
     varToClj (Qualified Nothing ident) = var ident
-    varToClj qual = qualifiedToClj qual
+    varToClj qual = qualifiedToClj id qual
 
-    qualifiedToClj :: Qualified Ident -> Clj
-    qualifiedToClj (Qualified (Just (ModuleName [ProperName mn'])) a)
-      | mn' == "Prim" = CljVar Nothing . runIdent $ a
-    qualifiedToClj (Qualified (Just mn') a)
-      | mn /= mn' = CljVar (Just $ runModuleName mn') (identToClj a)
-    qualifiedToClj (Qualified _ a) = CljVar Nothing $ identToClj a
+    qualifiedToClj :: (a -> Ident) -> Qualified a -> Clj
+    qualifiedToClj f (Qualified (Just (ModuleName [ProperName mn'])) a)
+      | mn' == "Prim" = CljVar Nothing . runIdent $ f a
+    qualifiedToClj f (Qualified (Just mn') a)
+      | mn /= mn' = CljVar (Just $ runModuleName mn') (identToClj $ f a)
+    qualifiedToClj f (Qualified _ a) = CljVar Nothing $ identToClj $ f a
+
+    letDef :: Text -> Clj -> Clj
+    letDef name val = CljDef False name (Just val)
 
 isMain :: ModuleName -> Bool
 isMain (ModuleName [ProperName "Main"]) = True

@@ -20,6 +20,9 @@ data Qualified a = Qualified (Maybe ModuleName) a
 newtype OpName = OpName String
   deriving (Eq, Ord, Show)
 
+runProperName :: ProperName -> Text
+runProperName (ProperName name) = name
+
 runModuleName :: ModuleName -> Text
 runModuleName (ModuleName pns) = T.intercalate "." $ pstrs
   where

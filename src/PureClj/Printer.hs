@@ -83,24 +83,26 @@ literals = mkPattern' match
       [ return $ emit (ident <> " ")
       , prettyPrintClj' val
       ]
-    match (CljLet [] ret) = prettyPrintClj' ret
-    match (CljLet binds ret) = mconcat <$> sequence
+    match (CljLet [] rets) = do
+      prints <- mapM prettyPrintClj' rets
+      return $ intercalate (emit "\n") prints
+    match (CljLet binds rets) = mconcat <$> sequence
       [ return $ emit "(let\n"
       , withIndent $ do
-          entries <- forM binds $ \bind -> prettyPrintClj' bind
+          entries <- forM binds prettyPrintClj'
           ind <- currentIndent
           return $ ind <> emit "[" <> (intercalate (emit "\n" <> ind <> emit " ") entries)
       , return $ emit "]\n"
       , withIndent $ do
-          ret' <- prettyPrintClj' ret
+          rets' <- forM rets prettyPrintClj'
           identString <- currentIndent
-          return $ identString <> ret'
+          return $ identString <> intercalate (emit "\n") rets'
       , return $ emit ")"
       ]
     match (CljCond conds el) = mconcat <$> sequence
       [ return $ emit "(cond\n"
       , intercalate (emit "\n") <$> forM conds printCond
-      , maybe (return mempty) (\el' -> printCond (CljKeywordLiteral ":else", el')) el
+      , maybe (return mempty) (\el' -> printCond (CljKeywordLiteral "else", el')) el
       , return $ emit ")"
       ]
       where
@@ -136,6 +138,9 @@ literals = mkPattern' match
           return $ indentString <> ret'
       , return $ emit ")"
       ]
+    match (CljThrow throw) = do
+      throw' <- prettyPrintClj' throw
+      return $ emit "(throw " <> throw' <> emit ")"
     match _ = mzero
 
 accessor :: Pattern PrinterState Clj (Text, Clj)
@@ -155,26 +160,28 @@ app :: (Emit gen) => Pattern PrinterState Clj (gen, Clj)
 app = mkPattern' match
   where
   match (CljApp val args) = do
-    jss <- traverse prettyPrintClj' args
-    return (intercalate (emit " ") jss, val)
+    cljs <- traverse prettyPrintClj' args
+    return (intercalate (emit " ") cljs, val)
   match (CljUnary Not val) = do
-    jss <- traverse prettyPrintClj' [val]
-    return (intercalate (emit " ") jss, CljVar Nothing "not")
+    cljs <- traverse prettyPrintClj' [val]
+    return (intercalate (emit " ") cljs, CljVar Nothing "not")
   match (CljUnary Negate val) = do
-    jss <- traverse prettyPrintClj' [val]
-    return (intercalate (emit " ") jss, CljVar Nothing "-")
+    cljs <- traverse prettyPrintClj' [val]
+    return (intercalate (emit " ") cljs, CljVar Nothing "-")
   match _ = mzero
 
 binary :: (Emit gen) => BinaryOperator -> Text -> Operator PrinterState Clj gen
-binary op str = AssocL match (\v1 v2 -> emit "(" <> emit str <> sp <> v1 <> sp <> v2 <> emit ")")
+binary op str = Wrap match (\vs v1 -> emit "(" <> emit str <> sp <> v1 <> sp <> vs <> emit ")")
   where
   sp :: (Emit gen) => gen
   sp = emit " "
-  match :: Pattern PrinterState Clj (Clj, Clj)
-  match = mkPattern match'
+  match :: (Emit gen) => Pattern PrinterState Clj (gen, Clj)
+  match = mkPattern' match'
     where
-    match' (CljBinary op' v1 v2) | op' == op = Just (v1, v2)
-    match' _ = Nothing
+    match' (CljBinary op' vs) | op' == op = do
+      vs' <- traverse prettyPrintClj' (tail vs)
+      return (intercalate (emit " ") vs', head vs)
+    match' _ = mzero
 
 prettyStatements :: (Emit gen) => [Clj] -> StateT PrinterState Maybe gen
 prettyStatements sts = do

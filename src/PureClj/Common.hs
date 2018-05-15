@@ -10,7 +10,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 
 identToClj :: Ident -> Text
-
 identToClj (Ident ident) = properToClj ident
 identToClj (GenIdent _ _) = error "GenIdent in identToClj"
 identToClj UnusedIdent = "!__unused"
