@@ -13,7 +13,6 @@ import Data.List (elemIndices, intersperse)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Char (isUpper)
 
 import CoreFn.Ann (SourcePos(..), SourceSpan(..))
 

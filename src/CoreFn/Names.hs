@@ -1,5 +1,7 @@
 module CoreFn.Names where
 
+import Prelude.Compat
+
 import CoreFn.Ident
 
 import Data.Monoid ((<>))

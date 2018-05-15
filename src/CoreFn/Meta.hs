@@ -1,5 +1,7 @@
 module CoreFn.Meta where
 
+import Prelude.Compat
+
 import CoreFn.Ident (Ident)
 
 data Meta

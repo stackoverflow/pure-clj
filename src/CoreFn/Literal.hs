@@ -1,5 +1,7 @@
 module CoreFn.Literal where
 
+import Prelude.Compat
+
 import Data.Text (Text)
 
 data Literal a

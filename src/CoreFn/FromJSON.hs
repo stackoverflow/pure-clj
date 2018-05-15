@@ -3,6 +3,8 @@ module CoreFn.FromJSON
   ( moduleFromJSON
   ) where
 
+import Prelude.Compat
+
 import CoreFn.Ann
 import CoreFn.Binders
 import CoreFn.Expr

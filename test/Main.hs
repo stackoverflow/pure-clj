@@ -2,6 +2,8 @@ module Main
   ( main
   ) where
 
+import Prelude.Compat
+
 import CoreFn
 import CoreFn.FromJSON
 import PureClj.AST
@@ -20,7 +22,7 @@ import Control.Monad.Supply.Class
 main :: IO ()
 main = do
   --contents <- readFile "test/resources/corefn_simple.json"
-  contents <- readFile "/home/islon/dev/repos/puretest/output/Main/corefn.json"
+  contents <- readFile "test/resources/corefn_simple.json"
   let parsed = decode $ toLazyStr contents :: Maybe Value
   case parsed of
     Just js -> do

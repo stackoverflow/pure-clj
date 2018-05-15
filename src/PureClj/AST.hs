@@ -1,7 +1,9 @@
 module PureClj.AST where
 
+import Prelude.Compat
+
 import Data.Text (Text)
-import CoreFn.Ann (Comment)
+--import CoreFn.Ann (Comment)
 
 data UnaryOperator
   -- | Numeric negation
@@ -50,8 +52,8 @@ data Clj
   | CljBooleanLiteral Bool
   | CljArrayLiteral [Clj]
   | CljObjectLiteral [(KeyType, Clj)]
-  | CljUnaryOperator UnaryOperator Clj
-  | CljBinaryOperator BinaryOperator Clj Clj
+  | CljUnary UnaryOperator Clj
+  | CljBinary BinaryOperator Clj Clj
   | CljArrayIndexer Clj Clj
   | CljAccessor KeyType Clj
   | CljFunction (Maybe Text) [Text] Clj

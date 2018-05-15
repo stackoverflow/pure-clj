@@ -2,12 +2,13 @@ module PureClj.Printer
   ( prettyPrintClj
   ) where
 
+import Prelude.Compat
+
 import Control.Arrow ((<+>))
 import qualified Control.Arrow as A
 import Control.Monad (forM, mzero)
 import Control.Monad.State (StateT, evalStateT)
 import Control.PatternArrows
-import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -156,10 +157,10 @@ app = mkPattern' match
   match (CljApp val args) = do
     jss <- traverse prettyPrintClj' args
     return (intercalate (emit " ") jss, val)
-  match (CljUnaryOperator Not val) = do
+  match (CljUnary Not val) = do
     jss <- traverse prettyPrintClj' [val]
     return (intercalate (emit " ") jss, CljVar Nothing "not")
-  match (CljUnaryOperator Negate val) = do
+  match (CljUnary Negate val) = do
     jss <- traverse prettyPrintClj' [val]
     return (intercalate (emit " ") jss, CljVar Nothing "-")
   match _ = mzero
@@ -172,7 +173,7 @@ binary op str = AssocL match (\v1 v2 -> emit "(" <> emit str <> sp <> v1 <> sp <
   match :: Pattern PrinterState Clj (Clj, Clj)
   match = mkPattern match'
     where
-    match' (CljBinaryOperator op' v1 v2) | op' == op = Just (v1, v2)
+    match' (CljBinary op' v1 v2) | op' == op = Just (v1, v2)
     match' _ = Nothing
 
 prettyStatements :: (Emit gen) => [Clj] -> StateT PrinterState Maybe gen

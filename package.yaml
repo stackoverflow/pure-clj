@@ -38,6 +38,7 @@ library:
   ghc-options: -Wall -O2
   default-extensions:
     - DeriveFunctor
+    - NoImplicitPrelude
     - OverloadedStrings
     - RankNTypes
     - ScopedTypeVariables

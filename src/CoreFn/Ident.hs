@@ -1,5 +1,7 @@
 module CoreFn.Ident where
 
+import Prelude.Compat
+
 import Data.Text (Text)
 
 data Ident

@@ -1,5 +1,7 @@
 module PureClj.CodeGen where
 
+import Prelude.Compat
+
 import CoreFn
 import PureClj.AST
 import PureClj.Common
@@ -150,6 +152,7 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
       let letFn = CljLet (zipWith (CljDef False) valNames (Just <$> vals))
       cljs <- forM binders $ \(CaseAlternative bs res) -> do
         ret <- guardToClj res
+        let conds = condToClj <$> bs
         binds <- forM bs $ binderToClj valNames ret
         return $ concat binds
       return $ letFn $ CljCond [] Nothing
@@ -160,6 +163,7 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
 
     condToClj :: Binder Ann -> Clj
     condToClj NullBinder{} = CljBooleanLiteral True
+    condToClj (LiteralBinder _ l) = undefined
 
     binderToClj :: [Text] -> [Clj] -> Binder Ann -> m [Clj]
     binderToClj _ done NullBinder{} = return done
@@ -167,6 +171,18 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
 
     literalToBinderClj :: Text -> [Clj] -> Literal (Binder Ann) -> [Clj]
     literalToBinderClj varName done (NumericLiteral num) = undefined
+
+    literalCondToClj :: Text -> Literal (Binder Ann) -> Clj
+    literalCondToClj varName (NumericLiteral n) =
+      CljBinary Equal (CljNumericLiteral n) (CljVar Nothing varName)
+    literalCondToClj varName (StringLiteral s) =
+      CljBinary Equal (CljStringLiteral s) (CljVar Nothing varName)
+    literalCondToClj varName (CharLiteral c) =
+      CljBinary Equal (CljCharLiteral c) (CljVar Nothing varName)
+    literalCondToClj varName (BooleanLiteral b) =
+      CljBinary Equal (CljBooleanLiteral b) (CljVar Nothing varName)
+    literalCondToClj varName (ArrayLiteral arr) = undefined
+    literalCondToClj varName (ObjectLiteral obj) = undefined
 
     -- | Generate a simple non-namespaced Clojure var
     var :: Ident -> Clj

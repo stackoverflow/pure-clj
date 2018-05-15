@@ -1,5 +1,7 @@
 module CoreFn.Binders where
 
+import Prelude.Compat
+
 import CoreFn.Literal (Literal)
 import CoreFn.Ident (Ident)
 import CoreFn.Names (Qualified, ProperName)

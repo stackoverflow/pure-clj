@@ -1,5 +1,7 @@
 module PureClj.Error where
 
+import Prelude.Compat
+
 import Control.Monad.Error.Class (MonadError(..))
 
 -- | Rethrow an error with a more detailed error message in the case of failure

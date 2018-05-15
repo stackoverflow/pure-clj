@@ -1,5 +1,7 @@
 module CoreFn.Module where
 
+import Prelude.Compat
+
 import CoreFn.Ann (Comment)
 import CoreFn.Expr (Bind)
 import CoreFn.Ident (Ident)

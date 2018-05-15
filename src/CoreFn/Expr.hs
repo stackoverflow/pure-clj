@@ -1,5 +1,7 @@
 module CoreFn.Expr where
 
+import Prelude.Compat
+
 import Control.Arrow ((***))
 import CoreFn.Binders (Binder)
 import CoreFn.Ident (Ident)

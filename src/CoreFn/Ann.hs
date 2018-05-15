@@ -2,6 +2,8 @@
 
 module CoreFn.Ann where
 
+import Prelude.Compat
+
 import CoreFn.Meta (Meta)
 import CoreFn.Names (Qualified, ProperName, OpName)
 import Data.Aeson ((.:))

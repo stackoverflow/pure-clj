@@ -1,5 +1,7 @@
 module PureClj.Common where
 
+import Prelude.Compat
+
 import CoreFn.Ident
 
 import Data.Char
