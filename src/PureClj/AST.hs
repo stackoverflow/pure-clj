@@ -63,7 +63,6 @@ data Clj
   | CljDef Bool Text (Maybe Clj)
   | CljLet [Clj] [Clj]
   | CljThrow Clj
-  -- | CljComment [Comment] Clj
   | CljObjectUpdate Clj [(KeyType, Clj)]
   | CljRequire Text Text
   | CljNamespace Text (Maybe Text) (Maybe Clj)

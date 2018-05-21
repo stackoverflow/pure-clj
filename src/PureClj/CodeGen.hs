@@ -17,23 +17,31 @@ nsComment :: Text
 nsComment = "Generated with pure-clj"
 
 moduleToClj :: forall m. (Monad m, MonadSupply m) => Module Ann -> m [Clj]
-moduleToClj (Module coms mn path imps exps foreigns decls) = do
+moduleToClj (Module _ mn _ imps exps foreigns decls) = do
   let imports = importToClj <$> (filter shouldImport imps)
-      imports' = case imports of
-                   [] -> Nothing
-                   _ -> Just $ CljApp (CljKeywordLiteral "require") imports
-      namespace = CljNamespace (runModuleName mn <> ".core") (Just nsComment) imports'
+      imports' = if null foreigns
+                 then imports
+                 else CljRequire (runModuleName mn <> "._foreign") "_foreign" : imports
+      imports'' = if null imports'
+                  then Nothing
+                  else Just $ CljApp (CljKeywordLiteral "require") imports'
+      namespace = CljNamespace (runModuleName mn <> "._core") (Just nsComment) imports''
       declares = makeDeclares decls
+      foreigns' = map makeForeignImport foreigns
   definitions <- bindToClj True `mapM` decls
-  return $ namespace : declares ++ (concat definitions)
+  return $ namespace : declares ++ foreigns' ++ (concat definitions)
   where
     shouldImport :: (Ann, ModuleName) -> Bool
     shouldImport (_, mn') = mn' /= mn && mn' /= ModuleName [ProperName "Prim"]
 
     importToClj :: (Ann, ModuleName) -> Clj
-    importToClj (_,  mn') = CljRequire (name <> ".core") name
+    importToClj (_,  mn') = CljRequire (name <> "._core") name
       where
         name = runModuleName mn'
+
+    makeForeignImport :: Ident -> Clj
+    makeForeignImport ident =
+      CljDef True (runIdent ident) (Just (CljVar (Just "_foreign") (runIdent ident)))
 
     makeDeclares :: [Bind Ann] -> [Clj]
     makeDeclares binds = concatMap declare binds
@@ -155,19 +163,24 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
           throw = CljThrow $ CljApp (var' "ex-info")
             [ CljStringLiteral "Exhausted pattern matching"
             , CljObjectLiteral []]
-      cljs <- forM binders $ \(CaseAlternative bs res) -> do
-        ret <- guardToClj res
-        binds <- zipWithM binderToClj valNames bs
-        allConds <- zipWithM condToClj valNames bs
-        let cljAnd = CljBinary And
-            conds' = filter notTrue (concat allConds)
-            conds = if null conds' then CljBooleanLiteral True else cljAnd conds'
-            let' = CljLet (concat binds)
-        case ret of
-          Left ret' -> return $ (\(c, v) -> (cljAnd $ let' [c] : conds', let' [v])) <$> ret'
-          Right ret' -> return [(conds, let' [ret'])]
+      cljs <- forM binders (processBinder valNames)
       return $ letFn [CljCond (concat cljs) (Just throw)]
       where
+        processBinder :: [Text] -> CaseAlternative Ann -> m [(Clj, Clj)]
+        processBinder valNames' (CaseAlternative bs res) = do
+          ret <- guardToClj res
+          binds <- zipWithM binderToClj valNames' bs
+          allConds <- zipWithM condToClj valNames' bs
+          let cljAnd = CljBinary And
+              conds' = filter notTrue (concat allConds)
+              conds = if null conds' then CljBooleanLiteral True else cljAnd conds'
+              let' = CljLet (concat binds)
+          case ret of
+            -- | in case of guards
+            Left ret' -> return $ (\(c, v) -> (cljAnd $ let' [c] : conds', let' [v])) <$> ret'
+            -- | no guards
+            Right ret' -> return [(conds, let' [ret'])]
+
         notTrue :: Clj -> Bool
         notTrue (CljBooleanLiteral True) = False
         notTrue _ = True
