@@ -126,7 +126,7 @@ literals = mkPattern' match
     match (CljNamespace ns comm req) = mconcat <$> sequence
       [ return $ emit $ "(ns " <> ns
       , return $ emit (maybe " " (\cm -> "\n  \"" <> cm <> "\"\n  ") comm)
-      , maybe mzero (\req' -> prettyPrintClj' req') req
+      , maybe (return $ emit "") (\req' -> prettyPrintClj' req') req
       , return $ emit ")"
       ]
     match (CljFunction mname args ret) = mconcat <$> sequence
@@ -148,7 +148,7 @@ accessor :: Pattern PrinterState Clj (Text, Clj)
 accessor = mkPattern match
   where
   match (CljAccessor (KeyWord prop) val) = Just (T.cons ':' prop, val)
-  match (CljAccessor (KeyStr prop) val) = Just (prop, val)
+  match (CljAccessor (KeyStr prop) val) = Just ("\"" <> prop <> "\"", val)
   match _ = Nothing
 
 indexer :: (Emit gen) => Pattern PrinterState Clj (gen, Clj)
