@@ -127,6 +127,7 @@ literals = mkPattern' match
       [ return $ emit $ "(ns " <> ns
       , return $ emit (maybe " " (\cm -> "\n  \"" <> cm <> "\"\n  ") comm)
       , maybe mzero (\req' -> prettyPrintClj' req') req
+      , return $ emit ")"
       ]
     match (CljFunction mname args ret) = mconcat <$> sequence
       [ return $ emit "(fn "

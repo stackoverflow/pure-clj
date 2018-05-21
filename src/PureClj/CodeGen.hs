@@ -236,17 +236,19 @@ moduleToClj (Module coms mn path imps exps foreigns decls) = do
       return $ [CljBinary Equal [(CljBooleanLiteral b), (var' varName)]]
     literalCondToClj varName (ArrayLiteral bs) = do
       cljs <- zipWithM (arrayCond varName) [0..] bs
-      return cljs
+      let lengthCheck = CljBinary Equal [CljNumericLiteral $ Left (length bs)
+                                      , CljApp (var' "count") [var' varName]]
+      return $ lengthCheck : cljs
       where
         arrayCond :: Text -> Int -> Binder Ann -> m Clj
         arrayCond _ _ NullBinder{} = return $ CljBooleanLiteral True
         arrayCond _ _ VarBinder{} = return $ CljBooleanLiteral True
         arrayCond varName' i binder = do
           newVar <- freshName
-          clj <- condToClj newVar binder
-          let accessor = (CljArrayIndexer (CljNumericLiteral $ Left i) (CljVar Nothing varName'))
-          let let' = CljLet [CljDef False newVar (Just accessor)]
-          return $ let' clj
+          cljs' <- condToClj newVar binder
+          let accessor = (CljArrayIndexer (CljNumericLiteral $ Left i) (var' varName'))
+              let' = CljLet [CljDef False newVar (Just accessor)]
+          return $ let' cljs'
 
     literalCondToClj varName (ObjectLiteral obj) = undefined
 
