@@ -66,9 +66,13 @@ literals = mkPattern' match
       ]
     match (CljVar (Just mn) name) = return $ emit mn <> emit "/" <> emit name
     match (CljVar Nothing name) = return $ emit name
-    match (CljDef True ident Nothing) = return $ emit ("(declare " <> ident <> ")")
-    match (CljDef True ident (Just val)) = mconcat <$> sequence
-      [ return $ emit $ "(def " <> ident <> "\n"
+    match (CljDeclare idents) = return $ emit ("(declare " <> (intercalate " " idents) <> ")")
+    match (CljDef LetDef ident val) = mconcat <$> sequence
+      [ return $ emit (ident <> " ")
+      , prettyPrintClj' val
+      ]
+    match (CljDef deft ident val) = mconcat <$> sequence
+      [ return $ emit $ "(def " <> (visibility deft) <> ident <> "\n"
       , identVal val
       , return $ emit ")"
       ]
@@ -79,10 +83,9 @@ literals = mkPattern' match
           indent' <- currentIndent
           return $ indent' <> clj'
 
-    match (CljDef False ident (Just val)) = mconcat <$> sequence
-      [ return $ emit (ident <> " ")
-      , prettyPrintClj' val
-      ]
+        visibility :: DefType -> Text
+        visibility TopPvt = "^:private "
+        visibility _ = ""
     match (CljLet [] rets) = do
       prints <- mapM prettyPrintClj' rets
       return $ intercalate (emit "\n") prints

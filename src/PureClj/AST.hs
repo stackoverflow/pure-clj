@@ -44,6 +44,12 @@ data KeyType
   | KeyWord Text
   deriving (Show, Eq, Read)
 
+data DefType
+  = Top
+  | TopPvt
+  | LetDef
+  deriving (Show, Eq, Read)
+
 data Clj
   = CljNumericLiteral (Either Int Double)
   | CljStringLiteral Text
@@ -60,7 +66,8 @@ data Clj
   | CljApp Clj [Clj]
   | CljVar (Maybe Text) Text
   | CljCond [(Clj, Clj)] (Maybe Clj)
-  | CljDef Bool Text (Maybe Clj)
+  | CljDef DefType Text Clj
+  | CljDeclare [Text]
   | CljLet [Clj] [Clj]
   | CljThrow Clj
   | CljObjectUpdate Clj [(KeyType, Clj)]

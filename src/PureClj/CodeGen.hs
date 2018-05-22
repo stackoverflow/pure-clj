@@ -27,7 +27,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
                   else Just $ CljApp (CljKeywordLiteral "require") imports'
       namespace = CljNamespace (runModuleName mn <> "._core") (Just nsComment) imports''
       declares = makeDeclares decls
-      foreigns' = map makeForeignImport foreigns
+      foreigns' = makeForeignImport <$> foreigns
   definitions <- bindToClj True `mapM` decls
   return $ namespace : declares ++ foreigns' ++ (concat definitions)
   where
@@ -41,16 +41,20 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
 
     makeForeignImport :: Ident -> Clj
     makeForeignImport ident =
-      CljDef True (runIdent ident) (Just (CljVar (Just "_foreign") (runIdent ident)))
+      CljDef (topType ident) (runIdent ident) (CljVar (Just "_foreign") (runIdent ident))
 
     makeDeclares :: [Bind Ann] -> [Clj]
-    makeDeclares binds = concatMap declare binds
+    makeDeclares binds =
+      let declares = concatMap declare binds
+      in if null declares
+         then []
+         else [def declares]
       where
-        declare :: Bind Ann -> [Clj]
-        declare (NonRec _ ident _) = def ident
-        declare (Rec vals) = concatMap def (snd . fst <$> vals)
+        declare :: Bind Ann -> [Ident]
+        declare (NonRec _ ident _) = [ident]
+        declare (Rec vals) = snd . fst <$> vals
 
-        def ident = [CljDef True (identToClj ident) Nothing]
+        def idents = CljDeclare (identToClj <$> idents)
 
     bindToClj :: Bool -> Bind Ann -> m [Clj]
     bindToClj isTopLv (NonRec ann ident val) = return <$> exprToClj isTopLv (ann, ident) val
@@ -62,8 +66,9 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
           expr' <- valToClj expr
           return $ CljFunction (Just "-main") ["& args"] (CljApp expr' [])
     exprToClj isTopLv (_, ident) expr = do
+      let deft = if isTopLv then topType ident else LetDef
       expr' <- valToClj expr
-      return $ CljDef isTopLv (identToClj ident) (Just expr')
+      return $ CljDef deft (identToClj ident) expr'
 
     valToClj :: Expr Ann -> m Clj
     valToClj (Literal _ expr) = literalToClj expr
@@ -119,9 +124,9 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       binds <- mapM (bindToClj False) bs
       return $ CljLet (concat binds) [ret]
     valToClj (Constructor (_, _, _, Just IsNewtype) _ (ProperName ctor) _) =
-      return $ CljDef False (properToClj ctor) (Just $
+      return $ CljDef LetDef (properToClj ctor) $
                  CljObjectLiteral [(KeyWord "create",
-                                    CljFunction Nothing ["value"] (var' "value"))])
+                                    CljFunction Nothing ["value"] (var' "value"))]
     valToClj (Constructor _ _ (ProperName ctor) []) =
       return $ CljFunction Nothing [] (CljObjectLiteral [(KeyWord "type",
                                                           CljKeywordLiteral (properToClj ctor))])
@@ -134,8 +139,8 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
                  (KeyWord "create", var' "create") : [(KeyWord v, var' v) | v <- vars]
           createFn = foldr (\f inner -> CljFunction (nameCtorF "create" f) [f] inner) body vars
       in return $ CljFunction Nothing [] $
-                    CljLet [CljDef False "m" $ Just obj,
-                            CljDef False "create" $ Just createFn] [letBody]
+                    CljLet [CljDef LetDef "m" obj,
+                            CljDef LetDef "create" createFn] [letBody]
       where
         nameCtorF :: Text -> Text -> Maybe Text
         nameCtorF name var'' | "value0" == var'' = Just name
@@ -159,7 +164,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
     bindersToClj :: [CaseAlternative Ann] -> [Clj] -> m Clj
     bindersToClj binders vals = do
       valNames <- replicateM (length vals) freshName
-      let letFn = CljLet (zipWith (CljDef False) valNames (Just <$> vals))
+      let letFn = CljLet (zipWith (CljDef LetDef) valNames vals)
           throw = CljThrow $ CljApp (var' "ex-info")
             [ CljStringLiteral "Exhausted pattern matching"
             , CljObjectLiteral []]
@@ -228,7 +233,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
           newVar <- freshName
           clj <- binderToClj newVar binder
           let accessor = (CljArrayIndexer (CljNumericLiteral $ Left i) (var' varName'))
-              def = CljDef False newVar (Just accessor)
+              def = CljDef LetDef newVar accessor
           return $ def : clj
 
     literalBinderToClj varName (ObjectLiteral bs) = do
@@ -241,7 +246,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
           newVar <- freshName
           clj <- binderToClj newVar binder
           let accessor = (CljAccessor (KeyStr prop) $ var' varName')
-              def = CljDef False newVar (Just accessor)
+              def = CljDef LetDef newVar accessor
           return $ def : clj
 
     literalBinderToClj _ _ = return []
@@ -283,7 +288,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
           newVar <- freshName
           cljs' <- condToClj newVar binder
           let accessor = (CljArrayIndexer (CljNumericLiteral $ Left i) (var' varName'))
-              let' = CljLet [CljDef False newVar (Just accessor)]
+              let' = CljLet [CljDef LetDef newVar accessor]
           return $ let' cljs'
 
     literalCondToClj varName (ObjectLiteral obj) = mapM (objCond varName) obj
@@ -295,7 +300,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
           newVar <- freshName
           cljs' <- condToClj newVar binder
           let accessor = (CljAccessor (KeyStr prop) $ var' varName')
-              let' = CljLet [CljDef False newVar (Just accessor)]
+              let' = CljLet [CljDef LetDef newVar accessor]
           return $ let' cljs'
 
     -- | Generate a simple non-namespaced Clojure var
@@ -317,7 +322,11 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
     qualifiedToClj f (Qualified _ a) = CljVar Nothing $ identToClj $ f a
 
     letDef :: Text -> Clj -> Clj
-    letDef name val = CljDef False name (Just val)
+    letDef name val = CljDef LetDef name val
+
+    topType :: Ident -> DefType
+    topType ident | ident `elem` exps = Top
+                | otherwise = TopPvt
 
 isMain :: ModuleName -> Bool
 isMain (ModuleName [ProperName "Main"]) = True
