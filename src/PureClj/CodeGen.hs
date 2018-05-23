@@ -211,11 +211,6 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       return $ (innerCond, (letDef (identToClj ident) $ var' varName) : inner)
     binderToClj varName (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [binder]) =
       binderToClj varName binder
-    binderToClj varName (ConstructorBinder (_, _, _, Just (IsConstructor SumType [])) _ ctor _) = do
-      return ([CljBinary Equal [ accessType (var' varName)
-                               , accessType (qualifiedToClj (Ident . runProperName) ctor)]], [])
-      where
-        accessType value = CljAccessor (KeyWord "type") value
     binderToClj varName (ConstructorBinder (_, _, _, Just (IsConstructor ct fields)) _ ctor bs) = do
       defs <- zipWithM (go $ var' varName) fields bs
       let res@(conds, binds) = fold defs
@@ -255,8 +250,10 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
           (conds, cljs') <- binderToClj newVar binder
           let accessor = (CljArrayIndexer (CljNumericLiteral $ Left i) (var' varName'))
               def = CljDef LetDef newVar accessor
-              let' = CljLet [CljDef LetDef newVar accessor]
-          return ([let' conds], def : cljs')
+              let' = case binder of
+                       VarBinder{} -> [CljBooleanLiteral True]
+                       _ -> [CljLet [CljDef LetDef newVar accessor] conds]
+          return (let', def : cljs')
 
     literalBinderToClj varName (ObjectLiteral bs) = do
       cljs <- mapM (objBinder varName) bs
@@ -269,61 +266,10 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
           (conds, cljs') <- binderToClj newVar binder
           let accessor = (CljAccessor (KeyStr prop) $ var' varName')
               def = CljDef LetDef newVar accessor
-              let' = CljLet [CljDef LetDef newVar accessor]
-          return ([let' conds], def : cljs')
-
-    condToClj :: Text -> Binder Ann -> m [Clj]
-    condToClj _ NullBinder{} = return $ [CljBooleanLiteral True]
-    condToClj _ VarBinder{} = return $ [CljBooleanLiteral True]
-    condToClj val (LiteralBinder _ l) = literalCondToClj val l
-    condToClj val (NamedBinder _ _ binder) = condToClj val binder
-    condToClj val (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [binder]) =
-      condToClj val binder
-    condToClj val (ConstructorBinder (_, _, _, Just (IsConstructor _ _)) _ ctor _) =
-      let typeCheck = CljBinary Equal [ accessType (var' val)
-                                      , accessType (qualifiedToClj (Ident . runProperName) ctor)]
-      in return $ [typeCheck]
-      where
-        accessType :: Clj -> Clj
-        accessType value = CljAccessor (KeyWord "type") value
-    condToClj _ ConstructorBinder{} = error "condToClj: invalid ConstructorBinder"
-
-    literalCondToClj :: Text -> Literal (Binder Ann) -> m [Clj]
-    literalCondToClj varName (NumericLiteral n) =
-      return $ [CljBinary Equal [(CljNumericLiteral n), (var' varName)]]
-    literalCondToClj varName (StringLiteral s) =
-      return $ [CljBinary Equal [(CljStringLiteral s), (var' varName)]]
-    literalCondToClj varName (CharLiteral c) =
-      return $ [CljBinary Equal [(CljCharLiteral c), (var' varName)]]
-    literalCondToClj varName (BooleanLiteral b) =
-      return $ [CljBinary Equal [(CljBooleanLiteral b), (var' varName)]]
-    literalCondToClj varName (ArrayLiteral bs) = do
-      cljs <- zipWithM (arrayCond varName) [0..] bs
-      let lengthCheck = CljBinary Equal [ CljNumericLiteral $ Left (length bs)
-                                        , CljApp (var' "count") [var' varName]]
-      return $ lengthCheck : cljs
-      where
-        arrayCond :: Text -> Int -> Binder Ann -> m Clj
-        arrayCond _ _ NullBinder{} = return $ CljBooleanLiteral True
-        arrayCond _ _ VarBinder{} = return $ CljBooleanLiteral True
-        arrayCond varName' i binder = do
-          newVar <- freshName
-          cljs' <- condToClj newVar binder
-          let accessor = (CljArrayIndexer (CljNumericLiteral $ Left i) (var' varName'))
-              let' = CljLet [CljDef LetDef newVar accessor]
-          return $ let' cljs'
-
-    literalCondToClj varName (ObjectLiteral obj) = mapM (objCond varName) obj
-      where
-        objCond :: Text -> (Text, Binder Ann) -> m Clj
-        objCond _ (_, NullBinder{}) = return $ CljBooleanLiteral True
-        objCond _ (_, VarBinder{}) = return $ CljBooleanLiteral True
-        objCond varName' (prop, binder) = do
-          newVar <- freshName
-          cljs' <- condToClj newVar binder
-          let accessor = (CljAccessor (KeyStr prop) $ var' varName')
-              let' = CljLet [CljDef LetDef newVar accessor]
-          return $ let' cljs'
+              let' = case binder of
+                       VarBinder{} -> [CljBooleanLiteral True]
+                       _ -> [CljLet [CljDef LetDef newVar accessor] conds]
+          return (let', def : cljs')
 
     -- | Generate a simple non-namespaced Clojure var
     var :: Ident -> Clj
