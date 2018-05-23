@@ -175,12 +175,13 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
         processBinder :: [Text] -> CaseAlternative Ann -> m [(Clj, Clj)]
         processBinder valNames' (CaseAlternative bs res) = do
           ret <- guardToClj res
-          binds <- zipWithM binderToClj valNames' bs
-          allConds <- zipWithM condToClj valNames' bs
+          condBinds <- zipWithM binderToClj valNames' bs
+          --allConds <- zipWithM condToClj valNames' bs
           let cljAnd = CljBinary And
-              conds' = filter notTrue (concat allConds)
+              (allConds, binds) = fold condBinds
+              conds' = filter notTrue allConds
               conds = if null conds' then CljBooleanLiteral True else cljAnd conds'
-              let' = CljLet (concat binds)
+              let' = CljLet binds
           case ret of
             -- | in case of guards
             Left ret' -> return $ (\(c, v) -> (cljAnd $ let' [c] : conds', let' [v])) <$> ret'
@@ -210,16 +211,28 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       return $ (innerCond, (letDef (identToClj ident) $ var' varName) : inner)
     binderToClj varName (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [binder]) =
       binderToClj varName binder
+    binderToClj varName (ConstructorBinder (_, _, _, Just (IsConstructor SumType [])) _ ctor _) = do
+      return ([CljBinary Equal [ accessType (var' varName)
+                               , accessType (qualifiedToClj (Ident . runProperName) ctor)]], [])
+      where
+        accessType value = CljAccessor (KeyWord "type") value
     binderToClj varName (ConstructorBinder (_, _, _, Just (IsConstructor ct fields)) _ ctor bs) = do
       defs <- zipWithM (go $ var' varName) fields bs
-      return $ fold defs
+      let res@(conds, binds) = fold defs
+      return $ case ct of
+        ProductType -> res
+        SumType -> ( CljBinary Equal [ accessType (var' varName)
+                                     , accessType (qualifiedToClj (Ident . runProperName) ctor)] : conds
+                   , binds)
       where
+        accessType value = CljAccessor (KeyWord "type") value
         go :: Clj -> Ident -> Binder Ann -> m ([Clj], [Clj])
         go ctorVar ident bind = do
           argVar <- freshName
-          (conds, cljs) <- binderToClj argVar bind
+          (conds', cljs) <- binderToClj argVar bind
           let argClj = letDef argVar (CljAccessor (KeyWord . runIdent $ ident) ctorVar)
-          return $ (conds, argClj : cljs)
+          let letCond = CljLet [argClj]
+          return $ ([letCond conds'], argClj : cljs)
     binderToClj _ ConstructorBinder{} = error "binderToClj: invalid ConstructorBinder"
 
     literalBinderToClj :: Text -> Literal (Binder Ann) -> m ([Clj], [Clj])
@@ -243,20 +256,21 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
           let accessor = (CljArrayIndexer (CljNumericLiteral $ Left i) (var' varName'))
               def = CljDef LetDef newVar accessor
               let' = CljLet [CljDef LetDef newVar accessor]
-          return $ ([let' conds], def : cljs')
+          return ([let' conds], def : cljs')
 
     literalBinderToClj varName (ObjectLiteral bs) = do
       cljs <- mapM (objBinder varName) bs
-      return $ concat cljs
+      return $ fold cljs
       where
-        objBinder :: Text -> (Text, Binder Ann) -> m [Clj]
-        objBinder _ (_, NullBinder{}) = return []
+        objBinder :: Text -> (Text, Binder Ann) -> m ([Clj], [Clj])
+        objBinder _ (_, NullBinder{}) = return ([CljBooleanLiteral True], [])
         objBinder varName' (prop, binder) = do
           newVar <- freshName
-          clj <- binderToClj newVar binder
+          (conds, cljs') <- binderToClj newVar binder
           let accessor = (CljAccessor (KeyStr prop) $ var' varName')
               def = CljDef LetDef newVar accessor
-          return $ def : clj
+              let' = CljLet [CljDef LetDef newVar accessor]
+          return ([let' conds], def : cljs')
 
     condToClj :: Text -> Binder Ann -> m [Clj]
     condToClj _ NullBinder{} = return $ [CljBooleanLiteral True]
