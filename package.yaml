@@ -44,20 +44,22 @@ library:
     - ScopedTypeVariables
 
 executables:
-  pure-clj-exe:
-    main:                Main.hs
-    source-dirs:         app
+  pursclj:
+    main: Main.hs
+    source-dirs: app
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - ansi-wl-pprint
+    - optparse-applicative
     - pure-clj
 
 tests:
   pure-clj-test:
-    main:                Main.hs
-    source-dirs:         test
+    main: Main.hs
+    source-dirs: test
     ghc-options:
     - -threaded
     - -rtsopts

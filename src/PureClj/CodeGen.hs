@@ -294,7 +294,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
 
     topType :: Ident -> DefType
     topType ident | ident `elem` exps = Top
-                | otherwise = TopPvt
+                  | otherwise = TopPvt
 
 isMain :: ModuleName -> Bool
 isMain (ModuleName [ProperName "Main"]) = True
