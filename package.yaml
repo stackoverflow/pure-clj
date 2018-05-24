@@ -53,6 +53,8 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - ansi-wl-pprint
+    - directory
+    - filepath
     - optparse-applicative
     - process
     - pure-clj

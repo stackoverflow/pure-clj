@@ -2,7 +2,7 @@ module Main where
 
 import Prelude.Compat
 
-import qualified Command.Build as Build
+import qualified Command.Compile as Compile
 
 import qualified Options.Applicative as Opts
 import qualified System.IO as IO
@@ -43,5 +43,5 @@ main = do
     commands =
       (Opts.subparser . fold)
       [ Opts.command "compile"
-        (Opts.info Build.command
+        (Opts.info Compile.command
          (Opts.progDesc "Compile PureScript source files"))]
