@@ -54,6 +54,7 @@ executables:
     dependencies:
     - ansi-wl-pprint
     - optparse-applicative
+    - process
     - pure-clj
 
 tests:
