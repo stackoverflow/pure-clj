@@ -99,7 +99,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
         unAbs _ = []
 
         toEntry :: Text -> (KeyType, Clj)
-        toEntry arg = (KeyWord arg, var' arg)
+        toEntry arg = (KeyStr arg, var' arg)
     valToClj (Abs _ arg val) = do
       ret <- valToClj val
       let cljArgs = case arg of

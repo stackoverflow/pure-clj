@@ -26,8 +26,8 @@ runProperName (ProperName name) = name
 runModuleName :: ModuleName -> Text
 runModuleName (ModuleName pns) = T.intercalate "." $ runProperName <$> pns
 
-runModuleNameList :: ModuleName -> [Text]
-runModuleNameList (ModuleName pns) = runProperName <$> pns
+runModuleNamePath :: ModuleName -> [FilePath]
+runModuleNamePath (ModuleName pns) = map T.unpack $ runProperName <$> pns
 
 runIdent :: Ident -> Text
 runIdent (Ident i) = i

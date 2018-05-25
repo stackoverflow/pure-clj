@@ -55,6 +55,7 @@ executables:
     - ansi-wl-pprint
     - directory
     - filepath
+    - Glob
     - optparse-applicative
     - process
     - pure-clj
