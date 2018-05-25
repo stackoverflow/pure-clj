@@ -24,10 +24,10 @@ runProperName :: ProperName -> Text
 runProperName (ProperName name) = name
 
 runModuleName :: ModuleName -> Text
-runModuleName (ModuleName pns) = T.intercalate "." $ pstrs
-  where
-    pstrs = unwrap <$> pns
-    unwrap (ProperName p) = p
+runModuleName (ModuleName pns) = T.intercalate "." $ runProperName <$> pns
+
+runModuleNameList :: ModuleName -> [Text]
+runModuleNameList (ModuleName pns) = runProperName <$> pns
 
 runIdent :: Ident -> Text
 runIdent (Ident i) = i

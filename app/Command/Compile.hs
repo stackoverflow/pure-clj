@@ -14,22 +14,25 @@ import Data.Text (Text)
 import System.Directory
 import System.Exit (ExitCode(..))
 import System.FilePath ((</>))
-import System.IO.UTF8 (readFileUTF8)
+import System.IO.UTF8 (readFileUTF8, writeFileUTF8)
 import System.Process (readProcessWithExitCode)
+
+import PureClj.Build
 
 -- | `purs` should be in the path
 purs :: FilePath
 purs = "purs"
 
 data PurscljMakeOptions = PurscljMakeOptions
-  { pcljInput        :: [FilePath]
-  , pcljOutputDir    :: FilePath
-  , pcljJSONErrors   :: Bool
+  { pcljInput         :: [FilePath]
+  , pcljPursOutputDir :: FilePath
+  , pcljOutputDir     :: FilePath
+  , pcljJSONErrors    :: Bool
   }
 
 compile :: PurscljMakeOptions -> IO ()
 compile opts@PurscljMakeOptions{..} = do
-  let pars = "compile" : pcljInput ++ ["-o", pcljOutputDir </> "_purs"] ++ ["-g", "corefn"]
+  let pars = "compile" : pcljInput ++ ["-o", pcljPursOutputDir] ++ ["-g", "corefn"]
       pars' = if pcljJSONErrors then pars ++ ["--json-errors"] else pars
   putStrLn $ show pars'
   (excode, out, err) <- readProcessWithExitCode purs pars' ""
@@ -46,14 +49,12 @@ compile opts@PurscljMakeOptions{..} = do
 
 compileClj :: PurscljMakeOptions -> IO ()
 compileClj PurscljMakeOptions{..} = do
-  absPath <- makeAbsolute $ pcljOutputDir </> "_purs"
-  putStrLn $ "output " ++ absPath
-  corefns <- findCoreFns absPath
+  corefns <- findCoreFns pcljPursOutputDir
   modules <- readInput corefns
-  putStrLn $ show corefns
-
-compileCoreFn :: FilePath -> IO ()
-compileCoreFn path = undefined
+  let cljs = compileCoreFns modules
+  forM_ cljs (\(path, clj) -> do
+                 putStrLn $ "Writing to " ++ path
+                 writeFileUTF8 path clj)
 
 readInput :: [FilePath] -> IO [(FilePath, Text)]
 readInput inputFiles = forM inputFiles $ \inFile -> (inFile, ) <$> readFileUTF8 inFile
@@ -79,6 +80,14 @@ outputDirectory = Opts.strOption $
   <> Opts.showDefault
   <> Opts.help "The output directory"
 
+pursOutputDirectory :: Opts.Parser FilePath
+pursOutputDirectory = Opts.strOption $
+  Opts.short 'p'
+  <> Opts.long "purs-output"
+  <> Opts.value "purs-output"
+  <> Opts.showDefault
+  <> Opts.help "The purs compiler output directory"
+
 jsonErrors :: Opts.Parser Bool
 jsonErrors = Opts.switch $
   Opts.long "json-errors"
@@ -87,6 +96,7 @@ jsonErrors = Opts.switch $
 purscljMakeOptions :: Opts.Parser PurscljMakeOptions
 purscljMakeOptions = PurscljMakeOptions
   <$> many inputFile
+  <*> pursOutputDirectory
   <*> outputDirectory
   <*> jsonErrors
 

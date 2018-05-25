@@ -9,3 +9,6 @@ import qualified Data.Text.Encoding as TE
 
 readFileUTF8 :: FilePath -> IO Text
 readFileUTF8 file = fmap TE.decodeUtf8 (BS.readFile file)
+
+writeFileUTF8 :: FilePath -> Text -> IO ()
+writeFileUTF8 path text = BS.writeFile path (TE.encodeUtf8 text)
