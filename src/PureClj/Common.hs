@@ -96,6 +96,8 @@ isBuiltIn name =
   , "dec"
   , "max"
   , "min"
+  , "void"
+  , "Void"
   ]
 
 -- | Checks if an operator exists in Clojure

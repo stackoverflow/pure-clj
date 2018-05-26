@@ -5,6 +5,7 @@ import Prelude.Compat
 import CoreFn
 import PureClj.AST
 import PureClj.Common
+import PureClj.Optimizer
 
 import Control.Arrow
 import Control.Monad (replicateM, forM, zipWithM)
@@ -30,10 +31,15 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       declares = makeDeclares decls
       foreigns' = makeForeignImport <$> foreigns
   definitions <- bindToClj True `mapM` decls
-  return $ namespace : declares ++ foreigns' ++ (concat definitions)
+  let definitions' = concat definitions
+      optimized = optimize <$> definitions'
+  return $ namespace : declares ++ foreigns' ++ optimized
   where
     shouldImport :: (Ann, ModuleName) -> Bool
-    shouldImport (_, mn') = mn' /= mn && mn' /= ModuleName [ProperName "Prim"]
+    shouldImport (_, mn') = mn' /= mn && isNotPrim mn'
+      where
+        isNotPrim (ModuleName (p : _)) | p == (ProperName "Prim") = False
+        isNotPrim _ = True
 
     importToClj :: (Ann, ModuleName) -> Clj
     importToClj (_,  mn') = CljRequire (name <> "._core") name
