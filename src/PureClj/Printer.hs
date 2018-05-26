@@ -226,8 +226,11 @@ prettyPrintClj' = A.runKleisli $ runPattern matchValue
                     , [ binary Or "or" ]
                     , [ binary BitAnd "bit-and" ]
                     , [ binary BitOr "bit-or" ]
+                    , [ binary BitXor "bit-xor" ]
                     , [ binary ShiftLeft "bit-shift-left" ]
-                    , [ binary ShiftRight "bit-shift-right" ]]
+                    , [ binary ShiftRight "bit-shift-right" ]
+                    , [ binary UnsignedShiftRight "unsigned-bit-shift-right"
+                    ]]
       where
         sp :: (Emit gen) => gen
         sp = emit " "

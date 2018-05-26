@@ -105,6 +105,7 @@ isBuiltIn name =
   , "identity"
   , "apply"
   , "compare"
+  , "assert"
   ]
 
 -- | Checks if an operator exists in Clojure

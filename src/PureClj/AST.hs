@@ -36,14 +36,20 @@ data BinaryOperator
   | Or
   | BitAnd
   | BitOr
+  | BitXor
   | ShiftLeft
   | ShiftRight
+  | UnsignedShiftRight
   deriving (Show, Eq, Read)
 
 data KeyType
   = KeyStr Text
   | KeyWord Text
   deriving (Show, Eq, Read)
+
+runKeyType :: KeyType -> Text
+runKeyType (KeyStr k) = k
+runKeyType (KeyWord k) = k
 
 data DefType
   = Top

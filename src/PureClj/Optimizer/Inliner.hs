@@ -4,6 +4,9 @@ import Prelude.Compat
 
 import qualified PureClj.Constants as C
 
+import Data.String (IsString)
+import Data.Text (Text)
+
 import PureClj.AST
 import PureClj.Optimizer.Common
 
@@ -16,9 +19,111 @@ shouldInline (CljArrayIndexer index val) = shouldInline index && shouldInline va
 shouldInline (CljAccessor _ val) = shouldInline val
 shouldInline _ = False
 
+inlineCommonValues :: Clj -> Clj
+inlineCommonValues = everywhere convert
+  where
+  convert :: Clj -> Clj
+  convert (CljApp fn [dict])
+    | isDict' [semiringNumber, semiringInt] dict && isDict fnZero fn = CljNumericLiteral (Left 0)
+    | isDict' [semiringNumber, semiringInt] dict && isDict fnOne fn = CljNumericLiteral (Left 1)
+    | isDict boundedBoolean dict && isDict fnBottom fn = CljBooleanLiteral False
+    | isDict boundedBoolean dict && isDict fnTop fn = CljBooleanLiteral True
+  convert (CljApp (CljApp fn [dict]) [x])
+    | isDict ringInt dict && isDict fnNegate fn = CljUnary Negate x
+  convert (CljApp (CljApp (CljApp fn [dict]) [x]) [y])
+    | isDict semiringInt dict && isDict fnAdd fn = intOp Add x y
+    | isDict semiringInt dict && isDict fnMultiply fn = intOp Multiply x y
+    | isDict ringInt dict && isDict fnSubtract fn = intOp Subtract x y
+  convert other = other
+  fnZero = (C.dataSemiring, C.zero)
+  fnOne = (C.dataSemiring, C.one)
+  fnBottom = (C.dataBounded, C.bottom)
+  fnTop = (C.dataBounded, C.top)
+  fnAdd = (C.dataSemiring, C.add)
+  fnMultiply = (C.dataSemiring, C.mul)
+  fnSubtract = (C.dataRing, C.sub)
+  fnNegate = (C.dataRing, C.negate)
+  intOp op x y = CljBinary op [x, y]
+
 inlineCommonOps :: Clj -> Clj
 inlineCommonOps = everywhereTopDown $ applyAll $
-  []
+  [ binary semiringNumber opAdd Add
+  , binary semiringNumber opMul Multiply
+
+  , binary ringNumber opSub Subtract
+  , unary ringNumber opNegate Negate
+
+  , binary euclideanRingNumber opDiv Divide
+
+  , binary eqNumber opEq Equal
+  , binary eqNumber opNotEq NotEqual
+  , binary eqInt opEq Equal
+  , binary eqInt opNotEq NotEqual
+  , binary eqString opEq Equal
+  , binary eqString opNotEq NotEqual
+  , binary eqChar opEq Equal
+  , binary eqChar opNotEq NotEqual
+  , binary eqBoolean opEq Equal
+  , binary eqBoolean opNotEq NotEqual
+
+  , binary ordBoolean opLessThan LessThan
+  , binary ordBoolean opLessThanOrEq LessThanOrEqual
+  , binary ordBoolean opGreaterThan GreaterThan
+  , binary ordBoolean opGreaterThanOrEq GreaterThanOrEqual
+  , binary ordChar opLessThan LessThan
+  , binary ordChar opLessThanOrEq LessThanOrEqual
+  , binary ordChar opGreaterThan GreaterThan
+  , binary ordChar opGreaterThanOrEq GreaterThanOrEqual
+  , binary ordInt opLessThan LessThan
+  , binary ordInt opLessThanOrEq LessThanOrEqual
+  , binary ordInt opGreaterThan GreaterThan
+  , binary ordInt opGreaterThanOrEq GreaterThanOrEqual
+  , binary ordNumber opLessThan LessThan
+  , binary ordNumber opLessThanOrEq LessThanOrEqual
+  , binary ordNumber opGreaterThan GreaterThan
+  , binary ordNumber opGreaterThanOrEq GreaterThanOrEqual
+  , binary ordString opLessThan LessThan
+  , binary ordString opLessThanOrEq LessThanOrEqual
+  , binary ordString opGreaterThan GreaterThan
+  , binary ordString opGreaterThanOrEq GreaterThanOrEqual
+
+  , binary semigroupString opAppend StringAppend
+
+  , binary heytingAlgebraBoolean opConj And
+  , binary heytingAlgebraBoolean opDisj Or
+  , unary heytingAlgebraBoolean opNot Not
+
+  , binary' C.dataIntBits C.or BitOr
+  , binary' C.dataIntBits C.and BitAnd
+  , binary' C.dataIntBits C.xor BitXor
+  , binary' C.dataIntBits C.shl ShiftLeft
+  , binary' C.dataIntBits C.shr ShiftRight
+  , binary' C.dataIntBits C.zshr UnsignedShiftRight
+  , unary' C.dataIntBits C.complement BitwiseNot ]
+  where
+    binary :: (Text, Text) -> (Text, Text) -> BinaryOperator -> Clj -> Clj
+    binary dict fns op = convert where
+      convert :: Clj -> Clj
+      convert (CljApp (CljApp (CljApp fn [dict']) [x]) [y]) | isDict dict dict' && isDict fns fn =
+        CljBinary op [x, y]
+      convert other = other
+    binary' :: Text -> Text -> BinaryOperator -> Clj -> Clj
+    binary' moduleName opString op = convert where
+      convert :: Clj -> Clj
+      convert (CljApp (CljApp fn [x]) [y]) | isDict (moduleName, opString) fn =
+        CljBinary op [x, y]
+      convert other = other
+    unary :: (Text, Text) -> (Text, Text) -> UnaryOperator -> Clj -> Clj
+    unary dicts fns op = convert where
+      convert :: Clj -> Clj
+      convert (CljApp (CljApp fn [dict']) [x]) | isDict dicts dict' && isDict fns fn =
+        CljUnary op x
+      convert other = other
+    unary' :: Text -> Text -> UnaryOperator -> Clj -> Clj
+    unary' moduleName fnName op = convert where
+      convert :: Clj -> Clj
+      convert (CljApp fn [x]) | isDict (moduleName, fnName) fn = CljUnary op x
+      convert other = other
 
 -- | give names to functions defined in a `let`
 -- | so they can be called recursively
@@ -29,3 +134,102 @@ nameFunctions = everywhere name
     name (CljDef LetDef var (CljFunction Nothing pars bd)) =
       CljDef LetDef var (CljFunction (Just var) pars bd)
     name x = x
+
+ringNumber :: forall a b. (IsString a, IsString b) => (a, b)
+ringNumber = (C.dataRing, C.ringNumber)
+
+ringInt :: forall a b. (IsString a, IsString b) => (a, b)
+ringInt = (C.dataRing, C.ringInt)
+
+semiringNumber :: forall a b. (IsString a, IsString b) => (a, b)
+semiringNumber = (C.dataSemiring, C.semiringNumber)
+
+semiringInt :: forall a b. (IsString a, IsString b) => (a, b)
+semiringInt = (C.dataSemiring, C.semiringInt)
+
+euclideanRingNumber :: forall a b. (IsString a, IsString b) => (a, b)
+euclideanRingNumber = (C.dataEuclideanRing, C.euclideanRingNumber)
+
+semigroupString :: forall a b. (IsString a, IsString b) => (a, b)
+semigroupString = (C.dataSemigroup, C.semigroupString)
+
+eqNumber :: forall a b. (IsString a, IsString b) => (a, b)
+eqNumber = (C.dataEq, C.eqNumber)
+
+eqInt :: forall a b. (IsString a, IsString b) => (a, b)
+eqInt = (C.dataEq, C.eqInt)
+
+eqString :: forall a b. (IsString a, IsString b) => (a, b)
+eqString = (C.dataEq, C.eqString)
+
+eqChar :: forall a b. (IsString a, IsString b) => (a, b)
+eqChar = (C.dataEq, C.eqChar)
+
+eqBoolean :: forall a b. (IsString a, IsString b) => (a, b)
+eqBoolean = (C.dataEq, C.eqBoolean)
+
+opAdd :: forall a b. (IsString a, IsString b) => (a, b)
+opAdd = (C.dataSemiring, C.add)
+
+opMul :: forall a b. (IsString a, IsString b) => (a, b)
+opMul = (C.dataSemiring, C.mul)
+
+opSub :: forall a b. (IsString a, IsString b) => (a, b)
+opSub = (C.dataRing, C.sub)
+
+opNegate :: forall a b. (IsString a, IsString b) => (a, b)
+opNegate = (C.dataRing, C.negate)
+
+opDiv :: forall a b. (IsString a, IsString b) => (a, b)
+opDiv = (C.dataEuclideanRing, C.div)
+
+opEq :: forall a b. (IsString a, IsString b) => (a, b)
+opEq = (C.dataEq, C.eq)
+
+opNotEq :: forall a b. (IsString a, IsString b) => (a, b)
+opNotEq = (C.dataEq, C.notEq)
+
+opAppend :: forall a b. (IsString a, IsString b) => (a, b)
+opAppend = (C.dataSemigroup, C.append)
+
+ordBoolean :: forall a b. (IsString a, IsString b) => (a, b)
+ordBoolean = (C.dataOrd, C.ordBoolean)
+
+ordNumber :: forall a b. (IsString a, IsString b) => (a, b)
+ordNumber = (C.dataOrd, C.ordNumber)
+
+ordInt :: forall a b. (IsString a, IsString b) => (a, b)
+ordInt = (C.dataOrd, C.ordInt)
+
+ordString :: forall a b. (IsString a, IsString b) => (a, b)
+ordString = (C.dataOrd, C.ordString)
+
+ordChar :: forall a b. (IsString a, IsString b) => (a, b)
+ordChar = (C.dataOrd, C.ordChar)
+
+opLessThan :: forall a b. (IsString a, IsString b) => (a, b)
+opLessThan = (C.dataOrd, C.lessThan)
+
+opLessThanOrEq :: forall a b. (IsString a, IsString b) => (a, b)
+opLessThanOrEq = (C.dataOrd, C.lessThanOrEq)
+
+opGreaterThan :: forall a b. (IsString a, IsString b) => (a, b)
+opGreaterThan = (C.dataOrd, C.greaterThan)
+
+opGreaterThanOrEq :: forall a b. (IsString a, IsString b) => (a, b)
+opGreaterThanOrEq = (C.dataOrd, C.greaterThanOrEq)
+
+heytingAlgebraBoolean :: forall a b. (IsString a, IsString b) => (a, b)
+heytingAlgebraBoolean = (C.dataHeytingAlgebra, C.heytingAlgebraBoolean)
+
+opConj :: forall a b. (IsString a, IsString b) => (a, b)
+opConj = (C.dataHeytingAlgebra, C.conj)
+
+opDisj :: forall a b. (IsString a, IsString b) => (a, b)
+opDisj = (C.dataHeytingAlgebra, C.disj)
+
+opNot :: forall a b. (IsString a, IsString b) => (a, b)
+opNot = (C.dataHeytingAlgebra, C.not)
+
+boundedBoolean :: forall a b. (IsString a, IsString b) => (a, b)
+boundedBoolean = (C.dataBounded, C.boundedBoolean)

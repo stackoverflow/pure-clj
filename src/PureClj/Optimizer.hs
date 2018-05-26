@@ -8,4 +8,7 @@ import PureClj.Optimizer.Inliner
 
 optimize :: Clj -> Clj
 optimize = applyAll $
-  [nameFunctions]
+  [ nameFunctions
+  , inlineCommonValues
+  , inlineCommonOps
+  ]
