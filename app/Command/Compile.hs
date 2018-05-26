@@ -10,8 +10,9 @@ import qualified Options.Applicative as Opts
 
 import Control.Applicative (many)
 import Control.Monad
+import Data.Maybe (isJust)
 import Data.Monoid ((<>))
-import Data.List (intercalate, isSuffixOf)
+import Data.List (intercalate, isSuffixOf, find)
 import Data.Text (Text)
 import System.Directory
 import System.Exit (ExitCode(..))
@@ -58,34 +59,38 @@ compileClj PurscljMakeOptions{..} = do
   forM_ cljs $ \(module', clj) -> do
     let mn = (runModuleNamePath $ moduleName module') ++ ["_core.clj"]
         file = foldl (</>) pcljOutputDir mn
-    processForeigns module' pcljInput
-    putStrLn $ "Compiling " ++ (intercalate "." mn)
+    processForeigns module' pcljInput pcljOutputDir
+    putStrLn $ "Writing " ++ (intercalate "." mn)
     writeOutput file clj
 
-processForeigns :: Module Ann -> [FilePath] -> IO ()
-processForeigns m@Module{..} inputDirs =
+processForeigns :: Module Ann -> [FilePath] -> FilePath -> IO ()
+processForeigns m@Module{..} inputDirs outDir =
   case moduleForeign of
     [] -> return ()
     _ -> do
       let module' = runModuleNamePath moduleName
       globs <- mapM glob inputDirs
       mods <- mapM (hasForeign m) $ concat globs
-      if all (== Nothing) mods
-        then error $ "No foreign file found for module " ++ (intercalate "." module')
-        else do
-          return ()
+      let ffile = find isJust mods
+      case ffile of
+        Just (Just path) -> do
+          content <- readFileUTF8 path
+          let out = foldl (</>) outDir $ module' ++ ["_foreign.clj"]
+          putStrLn $ "Writing foreign " ++ out
+          writeOutput out content
+        _ -> error $ "No foreign file found for module " ++ (intercalate "." module')
 
-hasForeign :: Module Ann -> FilePath -> IO (Maybe (Module Ann))
-hasForeign m@Module{..} input = do
+hasForeign :: Module Ann -> FilePath -> IO (Maybe FilePath)
+hasForeign Module{..} input = do
   let mn = runModuleNamePath moduleName
       foreignFile = foldl1 (</>) mn
       input' = dropExtension input
   case isSuffixOf foreignFile input' of
     True -> do
-      putStrLn $ "Searching foreign on " ++ input'
-      exists <- doesFileExist $ input' <.> "clj"
+      let file = input' <.> "clj"
+      exists <- doesFileExist file
       if exists
-        then return $ Just m
+        then return $ Just file
         else return Nothing
     _ -> return Nothing
 
