@@ -31,8 +31,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       declares = makeDeclares decls
       foreigns' = makeForeignImport <$> foreigns
   definitions <- bindToClj True `mapM` decls
-  let definitions' = concat definitions
-      optimized = optimize <$> definitions'
+  let optimized = optimize <$> concat definitions
   return $ namespace : declares ++ foreigns' ++ optimized
   where
     shouldImport :: (Ann, ModuleName) -> Bool
@@ -97,15 +96,16 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       let ps' = zip keys vals
       return $ CljObjectUpdate obj ps'
     valToClj lam@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) =
-      let args = identToClj <$> unAbs lam
-      in return $ CljFunction Nothing args (CljObjectLiteral $ toEntry <$> args)
+      let args = unAbs lam
+          identArgs = identToClj <$> args
+      in return $ CljFunction Nothing identArgs (CljObjectLiteral $ toEntry <$> args)
       where
         unAbs :: Expr Ann -> [Ident]
         unAbs (Abs _ arg val) = arg : unAbs val
         unAbs _ = []
 
-        toEntry :: Text -> (KeyType, Clj)
-        toEntry arg = (KeyStr arg, var' arg)
+        toEntry :: Ident -> (KeyType, Clj)
+        toEntry arg = (KeyStr (runIdent arg), var' (identToClj arg))
     valToClj (Abs _ arg val) = do
       ret <- valToClj val
       let cljArgs = case arg of
@@ -121,11 +121,16 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
           return $ CljApp (CljAccessor (KeyWord "create") (qualifiedToClj id name)) args'
         Var (_, _, _, Just IsTypeClassConstructor) name ->
           return $ CljApp (qualifiedToClj id name) args'
-        _ -> flip (foldl (\fn a -> CljApp fn [a])) args' <$> valToClj f
+        _ -> flip (foldl (\fn a -> CljApp fn (makeParList a))) args' <$> valToClj f
       where
         unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
         unApp (App _ val arg) args = unApp val (arg : args)
         unApp other args = (other, args)
+
+        makeParList :: Clj -> [Clj]
+        makeParList (CljVar _ "undefined") = []
+        makeParList x = [x]
+
     valToClj (Let _ bs val) = do
       ret <- valToClj val
       binds <- mapM (bindToClj False) bs

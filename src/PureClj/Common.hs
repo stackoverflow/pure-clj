@@ -80,6 +80,7 @@ isBuiltIn name =
   , "defmethod"
   , "defmulti"
   , "defmacro"
+  , "not"
   , "not="
   , "or"
   , "and"
@@ -98,6 +99,12 @@ isBuiltIn name =
   , "min"
   , "void"
   , "Void"
+  , "cons"
+  , "conj"
+  , "disj"
+  , "identity"
+  , "apply"
+  , "compare"
   ]
 
 -- | Checks if an operator exists in Clojure
