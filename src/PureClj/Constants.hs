@@ -3,6 +3,7 @@ module PureClj.Constants where
 --import Prelude.Compat
 
 import Data.String (IsString)
+import Data.Text (Text)
 
 dataRing :: forall a. (IsString a) => a
 dataRing = "Data.Ring"
@@ -31,6 +32,15 @@ dataIntBits = "Data.Int.Bits"
 dataBounded :: forall a. (IsString a) => a
 dataBounded = "Data.Bounded"
 
+controlSemigroupoid :: forall a. (IsString a) => a
+controlSemigroupoid = "Control.Semigroupoid"
+
+controlBind :: forall a. (IsString a) => a
+controlBind = "Control.Bind"
+
+controlApplicative :: forall a. (IsString a) => a
+controlApplicative = "Control.Applicative"
+
 ringNumber :: forall a. (IsString a) => a
 ringNumber = "ringNumber"
 
@@ -45,6 +55,9 @@ semiringInt = "semiringInt"
 
 semigroupString :: forall a. (IsString a) => a
 semigroupString = "semigroupString"
+
+semigroupoidFn :: forall a. (IsString a) => a
+semigroupoidFn = "semigroupoidFn"
 
 euclideanRingNumber :: forall a. (IsString a) => a
 euclideanRingNumber = "euclideanRingNumber"
@@ -124,6 +137,9 @@ boundedBoolean = "boundedBoolean"
 heytingAlgebraBoolean :: forall a. (IsString a) => a
 heytingAlgebraBoolean = "heytingAlgebraBoolean"
 
+discardUnitDictionary :: forall a. (IsString a) => a
+discardUnitDictionary = "discardUnit"
+
 conj :: forall a. (IsString a) => a
 conj = "conj"
 
@@ -165,3 +181,56 @@ bottom = "bottom"
 
 top :: forall a. (IsString a) => a
 top = "top"
+
+compose :: forall a. (IsString a) => a
+compose = "compose"
+
+composeFlipped :: forall a. (IsString a) => a
+composeFlipped = "composeFlipped"
+
+partialUnsafe :: forall a. (IsString a) => a
+partialUnsafe = "Partial.Unsafe"
+
+unsafePartial :: forall a. (IsString a) => a
+unsafePartial = "unsafePartial"
+
+unsafeCoerce :: forall a. (IsString a) => a
+unsafeCoerce = "Unsafe.Coerce"
+
+unsafeCoerceFn :: forall a. (IsString a) => a
+unsafeCoerceFn = "unsafeCoerce"
+
+nil :: forall a. (IsString a) => a
+nil = "nil"
+
+bind :: forall a. (IsString a) => a
+bind = "bind"
+
+pure' :: forall a. (IsString a) => a
+pure' = "pure"
+
+discard :: forall a. (IsString a) => a
+discard = "discard"
+
+effect :: forall a. (IsString a) => a
+effect = "Effect"
+
+data EffectDictionaries = EffectDictionaries
+  { edApplicativeDict :: Text
+  , edBindDict :: Text
+  , edMonadDict :: Text
+  }
+
+effDictionaries :: EffectDictionaries
+effDictionaries = EffectDictionaries
+  { edApplicativeDict = "applicativeEff"
+  , edBindDict = "bindEff"
+  , edMonadDict = "monadEff"
+  }
+
+effectDictionaries :: EffectDictionaries
+effectDictionaries = EffectDictionaries
+  { edApplicativeDict = "applicativeEffect"
+  , edBindDict = "bindEffect"
+  , edMonadDict = "monadEffect"
+  }

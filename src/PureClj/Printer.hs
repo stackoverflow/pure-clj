@@ -172,20 +172,33 @@ app = mkPattern' match
   match (CljUnary Negate val) = do
     cljs <- traverse prettyPrintClj' [val]
     return (intercalate (emit " ") cljs, CljVar Nothing "-")
+  match (CljBinary op vals) = do
+    cljs <- traverse prettyPrintClj' vals
+    return (intercalate (emit " ") cljs, CljVar Nothing (binaryTable op))
   match _ = mzero
 
-binary :: (Emit gen) => BinaryOperator -> Text -> Operator PrinterState Clj gen
-binary op str = Wrap match (\vs v1 -> emit "(" <> emit str <> sp <> v1 <> sp <> vs <> emit ")")
-  where
-  sp :: (Emit gen) => gen
-  sp = emit " "
-  match :: (Emit gen) => Pattern PrinterState Clj (gen, Clj)
-  match = mkPattern' match'
-    where
-    match' (CljBinary op' vs) | op' == op = do
-      vs' <- traverse prettyPrintClj' (tail vs)
-      return (intercalate (emit " ") vs', head vs)
-    match' _ = mzero
+binaryTable :: BinaryOperator -> Text
+binaryTable = go where
+  go Add = "+"
+  go Subtract = "-"
+  go Multiply = "*"
+  go Divide = "/"
+  go Modulus = "mod"
+  go StringAppend = "str"
+  go Equal = "="
+  go NotEqual = "not="
+  go LessThan = "<"
+  go LessThanOrEqual = "<="
+  go GreaterThan = ">"
+  go GreaterThanOrEqual = ">="
+  go And = "and"
+  go Or = "or"
+  go BitAnd = "bit-and"
+  go BitOr = "bit-or"
+  go BitXor = "bit-xor"
+  go ShiftLeft = "bit-shift-left"
+  go ShiftRight = "bit-shift-right"
+  go UnsignedShiftRight = "unsigned-bit-shift-right"
 
 prettyStatements :: (Emit gen) => [Clj] -> StateT PrinterState Maybe gen
 prettyStatements sts = do
@@ -200,7 +213,7 @@ prettyPrintClj' :: (Emit gen) => Clj -> StateT PrinterState Maybe gen
 prettyPrintClj' = A.runKleisli $ runPattern matchValue
   where
     matchValue :: (Emit gen) => Pattern PrinterState Clj gen
-    matchValue = buildPrettyPrinter operators (literals <+> fmap parensPos matchValue)
+    matchValue = buildPrettyPrinter operators (literals <+> matchValue)
 
     operators :: (Emit gen) => OperatorTable PrinterState Clj gen
     operators =
@@ -210,27 +223,7 @@ prettyPrintClj' = A.runKleisli $ runPattern matchValue
                           emit "(nth " <> val <> sp <> index <> emit ")" ]
                     , [ Wrap app $ \args val ->
                           emit "(" <> val <> sp <> args <> emit ")" ]
-                    , [ binary Add "+" ]
-                    , [ binary Subtract "-" ]
-                    , [ binary Multiply "*" ]
-                    , [ binary Divide "/" ]
-                    , [ binary Modulus "mod" ]
-                    , [ binary StringAppend "str" ]
-                    , [ binary Equal "=" ]
-                    , [ binary NotEqual "not=" ]
-                    , [ binary LessThan "<" ]
-                    , [ binary LessThanOrEqual "<=" ]
-                    , [ binary GreaterThan ">" ]
-                    , [ binary GreaterThanOrEqual ">=" ]
-                    , [ binary And "and" ]
-                    , [ binary Or "or" ]
-                    , [ binary BitAnd "bit-and" ]
-                    , [ binary BitOr "bit-or" ]
-                    , [ binary BitXor "bit-xor" ]
-                    , [ binary ShiftLeft "bit-shift-left" ]
-                    , [ binary ShiftRight "bit-shift-right" ]
-                    , [ binary UnsignedShiftRight "unsigned-bit-shift-right"
-                    ]]
+                    ]
       where
         sp :: (Emit gen) => gen
         sp = emit " "

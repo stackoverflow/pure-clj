@@ -4,6 +4,7 @@ import Prelude.Compat
 
 import qualified PureClj.Constants as C
 
+import Control.Monad.Supply.Class
 import Data.String (IsString)
 import Data.Text (Text)
 
@@ -28,30 +29,25 @@ inlineCommonValues = everywhere convert
     | isDict' [semiringNumber, semiringInt] dict && isDict fnOne fn = CljNumericLiteral (Left 1)
     | isDict boundedBoolean dict && isDict fnBottom fn = CljBooleanLiteral False
     | isDict boundedBoolean dict && isDict fnTop fn = CljBooleanLiteral True
-  convert (CljApp (CljApp fn [dict]) [x])
-    | isDict ringInt dict && isDict fnNegate fn = CljUnary Negate x
-  convert (CljApp (CljApp (CljApp fn [dict]) [x]) [y])
-    | isDict semiringInt dict && isDict fnAdd fn = intOp Add x y
-    | isDict semiringInt dict && isDict fnMultiply fn = intOp Multiply x y
-    | isDict ringInt dict && isDict fnSubtract fn = intOp Subtract x y
   convert other = other
   fnZero = (C.dataSemiring, C.zero)
   fnOne = (C.dataSemiring, C.one)
   fnBottom = (C.dataBounded, C.bottom)
   fnTop = (C.dataBounded, C.top)
-  fnAdd = (C.dataSemiring, C.add)
-  fnMultiply = (C.dataSemiring, C.mul)
-  fnSubtract = (C.dataRing, C.sub)
-  fnNegate = (C.dataRing, C.negate)
-  intOp op x y = CljBinary op [x, y]
 
 inlineCommonOps :: Clj -> Clj
 inlineCommonOps = everywhereTopDown $ applyAll $
   [ binary semiringNumber opAdd Add
   , binary semiringNumber opMul Multiply
 
+  , binary semiringInt opAdd Add
+  , binary semiringInt opMul Multiply
+
   , binary ringNumber opSub Subtract
   , unary ringNumber opNegate Negate
+
+  , binary ringInt opSub Subtract
+  , unary ringInt opNegate Negate
 
   , binary euclideanRingNumber opDiv Divide
 
@@ -99,7 +95,8 @@ inlineCommonOps = everywhereTopDown $ applyAll $
   , binary' C.dataIntBits C.shl ShiftLeft
   , binary' C.dataIntBits C.shr ShiftRight
   , binary' C.dataIntBits C.zshr UnsignedShiftRight
-  , unary' C.dataIntBits C.complement BitwiseNot ]
+  , unary' C.dataIntBits C.complement BitwiseNot
+  ]
   where
     binary :: (Text, Text) -> (Text, Text) -> BinaryOperator -> Clj -> Clj
     binary dict fns op = convert where
@@ -124,6 +121,43 @@ inlineCommonOps = everywhereTopDown $ applyAll $
       convert :: Clj -> Clj
       convert (CljApp fn [x]) | isDict (moduleName, fnName) fn = CljUnary op x
       convert other = other
+
+inlineFnComposition :: forall m. MonadSupply m => Clj -> m Clj
+inlineFnComposition = everywhereTopDownM convert where
+  convert :: Clj -> m Clj
+  convert (CljApp (CljApp (CljApp (CljApp fn [dict']) [x]) [y]) [z])
+    | isFnCompose dict' fn = return $ CljApp x [CljApp y [z]]
+    | isFnComposeFlipped dict' fn = return $ CljApp y [CljApp x [z]]
+  convert (CljApp (CljApp (CljApp fn [dict']) [x]) [y])
+    | isFnCompose dict' fn = do
+        arg <- freshName
+        return $ CljFunction Nothing [arg] (CljApp x [CljApp y [CljVar Nothing arg]])
+    | isFnComposeFlipped dict' fn = do
+        arg <- freshName
+        return $ CljFunction Nothing [arg] (CljApp y [CljApp x [CljVar Nothing arg]])
+  convert other = return other
+  isFnCompose :: Clj -> Clj -> Bool
+  isFnCompose dict' fn = isDict semigroupoidFn dict' && isDict fnCompose fn
+  isFnComposeFlipped :: Clj -> Clj -> Bool
+  isFnComposeFlipped dict' fn = isDict semigroupoidFn dict' && isDict fnComposeFlipped fn
+  fnCompose :: forall a b. (IsString a, IsString b) => (a, b)
+  fnCompose = (C.controlSemigroupoid, C.compose)
+  fnComposeFlipped :: forall a b. (IsString a, IsString b) => (a, b)
+  fnComposeFlipped = (C.controlSemigroupoid, C.composeFlipped)
+
+inlineUnsafeCoerce :: Clj -> Clj
+inlineUnsafeCoerce = everywhereTopDown convert where
+  convert (CljApp (CljVar (Just unsafeCoerce) unsafeCoerceFn) [ comp ])
+    | unsafeCoerceFn == C.unsafeCoerceFn && unsafeCoerce == C.unsafeCoerce
+    = comp
+  convert other = other
+
+inlineUnsafePartial :: Clj -> Clj
+inlineUnsafePartial = everywhereTopDown convert where
+  convert (CljApp (CljVar (Just partialUnsafe) unsafePartial) [ comp ])
+    | unsafePartial == C.unsafePartial && partialUnsafe == C.partialUnsafe
+    = CljApp comp [ CljVar Nothing C.nil ]
+  convert other = other
 
 -- | give names to functions defined in a `let`
 -- | so they can be called recursively
@@ -233,3 +267,6 @@ opNot = (C.dataHeytingAlgebra, C.not)
 
 boundedBoolean :: forall a b. (IsString a, IsString b) => (a, b)
 boundedBoolean = (C.dataBounded, C.boundedBoolean)
+
+semigroupoidFn :: forall a b. (IsString a, IsString b) => (a, b)
+semigroupoidFn = (C.controlSemigroupoid, C.semigroupoidFn)

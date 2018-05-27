@@ -31,7 +31,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       declares = makeDeclares decls
       foreigns' = makeForeignImport <$> foreigns
   definitions <- bindToClj True `mapM` decls
-  let optimized = optimize <$> concat definitions
+  optimized <- mapM optimize $ concat definitions
   return $ namespace : declares ++ foreigns' ++ optimized
   where
     shouldImport :: (Ann, ModuleName) -> Bool
@@ -70,7 +70,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
     exprToClj _ (_, (Ident "main")) expr
       | isMain mn = do
           expr' <- valToClj expr
-          return $ CljFunction (Just "-main") ["& args"] (CljApp expr' [])
+          return $ CljDef Top "-main" $  CljFunction (Just "-main") ["& args"] (CljApp expr' [])
     exprToClj isTopLv (_, ident) expr = do
       let deft = if isTopLv then topType ident else LetDef
       expr' <- valToClj expr
@@ -118,7 +118,8 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       case f of
         Var (_, _, _, Just IsNewtype) _ -> return $ head args'
         Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
-          return $ CljApp (CljAccessor (KeyWord "create") (qualifiedToClj id name)) args'
+          let ctor = (CljApp (qualifiedToClj id name) []) in
+          return $ CljApp (CljAccessor (KeyWord "create") ctor) args'
         Var (_, _, _, Just IsTypeClassConstructor) name ->
           return $ CljApp (qualifiedToClj id name) args'
         _ -> flip (foldl (\fn a -> CljApp fn (makeParList a))) args' <$> valToClj f
@@ -128,7 +129,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
         unApp other args = (other, args)
 
         makeParList :: Clj -> [Clj]
-        makeParList (CljVar _ "undefined") = []
+        makeParList (CljVar Nothing "undefined") = [CljVar Nothing "nil"]
         makeParList x = [x]
 
     valToClj (Let _ bs val) = do
