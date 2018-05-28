@@ -80,7 +80,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
     valToClj (Literal _ expr) = literalToClj expr
     valToClj (Var (_, _, _, (Just (IsConstructor _ []))) name) = return $ qualifiedToClj id name
     valToClj (Var (_, _, _, (Just (IsConstructor _ _))) name) =
-      return $ CljAccessor (KeyWord "create") (qualifiedToClj id name)
+      return $ CljApp (CljKeywordLiteral "create") [(qualifiedToClj id name)]
     valToClj (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
       return $ if mn == mn'
                then var ident
@@ -118,8 +118,8 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       case f of
         Var (_, _, _, Just IsNewtype) _ -> return $ head args'
         Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
-          let ctor = (CljApp (qualifiedToClj id name) []) in
-          return $ CljApp (CljAccessor (KeyWord "create") ctor) args'
+          let ctor = (qualifiedToClj id name) in
+          return $ CljApp (CljApp (CljKeywordLiteral "create") [ctor]) args'
         Var (_, _, _, Just IsTypeClassConstructor) name ->
           return $ CljApp (qualifiedToClj id name) args'
         _ -> flip (foldl (\fn a -> CljApp fn (makeParList a))) args' <$> valToClj f
@@ -141,8 +141,8 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
                  CljObjectLiteral [(KeyWord "create",
                                     CljFunction Nothing ["value"] (var' "value"))]
     valToClj (Constructor _ _ (ProperName ctor) []) =
-      return $ CljFunction Nothing [] (CljObjectLiteral [(KeyWord "type",
-                                                          CljKeywordLiteral (properToClj ctor))])
+      return (CljObjectLiteral [(KeyWord "type",
+                                  CljKeywordLiteral (properToClj ctor))])
     valToClj (Constructor _ _ (ProperName ctor) fields) =
       let vars = (identToClj <$> fields)
           obj = CljObjectLiteral $ [(KeyWord "type", CljKeywordLiteral (properToClj ctor))]
@@ -151,8 +151,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
           body = CljObjectUpdate (var' "m") $
                  (KeyWord "create", var' "create") : [(KeyWord v, var' v) | v <- vars]
           createFn = foldr (\f inner -> CljFunction (nameCtorF "create" f) [f] inner) body vars
-      in return $ CljFunction Nothing [] $
-                    CljLet [CljDef LetDef "m" obj,
+      in return $ CljLet [CljDef LetDef "m" obj,
                             CljDef LetDef "create" createFn] [letBody]
       where
         nameCtorF :: Text -> Text -> Maybe Text
@@ -188,7 +187,6 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
         processBinder valNames' (CaseAlternative bs res) = do
           ret <- guardToClj res
           condBinds <- zipWithM binderToClj valNames' bs
-          --allConds <- zipWithM condToClj valNames' bs
           let cljAnd = CljBinary And
               (allConds, binds) = fold condBinds
               conds' = filter notTrue allConds
@@ -232,12 +230,12 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
                                      , accessType (qualifiedToClj (Ident . runProperName) ctor)] : conds
                    , binds)
       where
-        accessType value = CljAccessor (KeyWord "type") value
+        accessType value = CljApp (CljKeywordLiteral "type") [value]
         go :: Clj -> Ident -> Binder Ann -> m ([Clj], [Clj])
         go ctorVar ident bind = do
           argVar <- freshName
           (conds', cljs) <- binderToClj argVar bind
-          let argClj = letDef argVar (CljAccessor (KeyWord . runIdent $ ident) ctorVar)
+          let argClj = letDef argVar (CljApp (CljKeywordLiteral . runIdent $ ident) [ctorVar])
           let letCond = CljLet [argClj]
           return $ ([letCond conds'], argClj : cljs)
     binderToClj _ ConstructorBinder{} = error "binderToClj: invalid ConstructorBinder"
