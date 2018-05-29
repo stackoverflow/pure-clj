@@ -11,22 +11,13 @@ import Data.Text (Text)
 import PureClj.AST
 import PureClj.Optimizer.Common
 
-shouldInline :: Clj -> Bool
-shouldInline (CljVar _ _) = True
-shouldInline (CljNumericLiteral _) = True
-shouldInline (CljStringLiteral _) = True
-shouldInline (CljBooleanLiteral _) = True
-shouldInline (CljArrayIndexer index val) = shouldInline index && shouldInline val
-shouldInline (CljAccessor _ val) = shouldInline val
-shouldInline _ = False
-
-inlineLets :: Clj -> Clj
-inlineLets = everywhere convert where
-  convert (CljLet _ [val]) | inline val = val
-  convert other = other
-  inline (CljBooleanLiteral _) = True
-  inline (CljStringLiteral _) = True
-  inline _ = False
+etaConvert :: Clj -> Clj
+etaConvert = everywhere convert
+  where
+    convert :: Clj -> Clj
+    convert (CljFunction _ [p] (CljApp (CljVar ns v) [(CljVar Nothing p2)])) | p == p2 =
+      CljVar ns v
+    convert other = other
 
 inlineCommonValues :: Clj -> Clj
 inlineCommonValues = everywhere convert

@@ -20,7 +20,7 @@ optimize clj = do
       [ inlineCommonValues
       , inlineCommonOps
       , nameFunctions
-      , inlineLets
+      , etaConvert
       ]
 
 untilFixedPoint :: (Monad m, Eq a) => (a -> m a) -> a -> m a

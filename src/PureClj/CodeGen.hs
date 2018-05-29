@@ -184,7 +184,10 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
           let cljAnd = CljBinary And
               (allConds, binds) = fold condBinds
               conds' = filter notTrue allConds
-              conds = if null conds' then CljBooleanLiteral True else cljAnd conds'
+              conds = case conds' of
+                [] -> CljBooleanLiteral True
+                [c] -> c
+                cs -> cljAnd cs
               let' = CljLet binds
           case ret of
             -- | in case of guards
@@ -194,6 +197,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
 
         notTrue :: Clj -> Bool
         notTrue (CljBooleanLiteral True) = False
+        notTrue (CljLet _ [CljBooleanLiteral True]) = False
         notTrue _ = True
 
         guardToClj :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m (Either [(Clj, Clj)] Clj)

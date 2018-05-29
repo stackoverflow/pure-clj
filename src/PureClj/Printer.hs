@@ -105,6 +105,7 @@ literals = mkPattern' match
     match (CljCond conds el) = mconcat <$> sequence
       [ return $ emit "(cond\n"
       , intercalate (emit "\n") <$> forM conds printCond
+      , return $ emit "\n"
       , maybe (return mempty) (\el' -> printCond (CljKeywordLiteral "else", el')) el
       , return $ emit ")"
       ]
