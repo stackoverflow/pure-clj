@@ -11,6 +11,22 @@ import Data.Text (Text)
 import PureClj.AST
 import PureClj.Optimizer.Common
 
+shouldInline :: Clj -> Bool
+shouldInline (CljVar _ _) = True
+shouldInline (CljNumericLiteral _) = True
+shouldInline (CljStringLiteral _) = True
+shouldInline (CljKeywordLiteral _) = True
+shouldInline (CljCharLiteral _) = True
+shouldInline (CljBooleanLiteral _) = True
+shouldInline (CljArrayIndexer index val) = shouldInline index && shouldInline val
+shouldInline (CljAccessor _ val) = shouldInline val
+shouldInline (CljApp (CljKeywordLiteral _) [val]) = shouldInline val
+shouldInline _ = False
+
+shouldInlineDef :: Clj -> Bool
+shouldInlineDef (CljDef LetDef _ val) = shouldInline val
+shouldInlineDef _ = False
+
 etaConvert :: Clj -> Clj
 etaConvert = everywhere convert
   where
@@ -18,6 +34,33 @@ etaConvert = everywhere convert
     convert (CljFunction _ [p] (CljApp (CljVar ns v) [(CljVar Nothing p2)])) | p == p2 =
       CljVar ns v
     convert other = other
+
+inlineVariables :: Clj -> Clj
+inlineVariables = everywhere convert
+  where
+    convert :: Clj -> Clj
+    convert (CljLet [] [v]) = v
+    convert (CljLet [] vs) = CljApp (CljVar Nothing "do") vs
+    convert (CljLet defs []) | any shouldInline defs =
+      let defs' = filter (not . shouldInline) defs
+      in if null defs'
+         then CljNoOp
+         else CljLet defs' []
+    --convert (CljLet defs [v]) | any shouldInlineDef defs =
+    --  let replaces = mkReplaces defs
+    --  in foldl (\clj (var, rep) -> replaceIdent var rep clj) v replaces
+    convert other = other
+    mkReplaces :: [Clj] -> [(Text, Clj)]
+    mkReplaces [] = []
+    mkReplaces cljs = foldl (\m clj -> checkDef m clj) [] cljs
+      where
+        checkDef :: [(Text, Clj)] -> Clj -> [(Text, Clj)]
+        checkDef m (CljDef LetDef var v2@(CljVar Nothing var2)) | shouldInline v2 =
+          case lookup var2 m of
+            Just clj -> m ++ [(var, clj)]
+            Nothing -> m ++ [(var, v2)]
+        checkDef m (CljDef LetDef var clj) | shouldInline clj = m ++ [(var, clj)]
+        checkDef m _ = m
 
 inlineCommonValues :: Clj -> Clj
 inlineCommonValues = everywhere convert

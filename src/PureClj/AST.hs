@@ -80,6 +80,7 @@ data Clj
   | CljObjectUpdate Clj [(KeyType, Clj)]
   | CljRequire Text Text
   | CljNamespace Text (Maybe Text) (Maybe Clj)
+  | CljNoOp
   deriving (Show, Eq, Read)
 
 everywhere :: (Clj -> Clj) -> Clj -> Clj

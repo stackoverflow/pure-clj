@@ -86,9 +86,6 @@ literals = mkPattern' match
         visibility :: DefType -> Text
         visibility TopPvt = "^:private "
         visibility _ = ""
-    match (CljLet [] rets) = do
-      prints <- mapM prettyPrintClj' rets
-      return $ intercalate (emit "\n") prints
     match (CljLet binds rets) = mconcat <$> sequence
       [ return $ emit "(let\n"
       , withIndent $ do
@@ -146,6 +143,7 @@ literals = mkPattern' match
     match (CljThrow throw) = do
       throw' <- prettyPrintClj' throw
       return $ emit "(throw " <> throw' <> emit ")"
+    match (CljNoOp) = return $ emit ""
     match _ = mzero
 
 accessor :: Pattern PrinterState Clj (Text, Clj)
