@@ -20,6 +20,14 @@ shouldInline (CljArrayIndexer index val) = shouldInline index && shouldInline va
 shouldInline (CljAccessor _ val) = shouldInline val
 shouldInline _ = False
 
+inlineLets :: Clj -> Clj
+inlineLets = everywhere convert where
+  convert (CljLet _ [val]) | inline val = val
+  convert other = other
+  inline (CljBooleanLiteral _) = True
+  inline (CljStringLiteral _) = True
+  inline _ = False
+
 inlineCommonValues :: Clj -> Clj
 inlineCommonValues = everywhere convert
   where
