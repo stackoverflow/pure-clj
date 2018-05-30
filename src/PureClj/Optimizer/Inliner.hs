@@ -41,14 +41,9 @@ inlineVariables = everywhere convert
     convert :: Clj -> Clj
     convert (CljLet [] [v]) = v
     convert (CljLet [] vs) = CljApp (CljVar Nothing "do") vs
-    convert (CljLet defs []) | any shouldInline defs =
-      let defs' = filter (not . shouldInline) defs
-      in if null defs'
-         then CljNoOp
-         else CljLet defs' []
-    --convert (CljLet defs [v]) | any shouldInlineDef defs =
-    --  let replaces = mkReplaces defs
-    --  in foldl (\clj (var, rep) -> replaceIdent var rep clj) v replaces
+    convert (CljLet defs [v]) | any shouldInlineDef defs =
+      let defs' = mkReplaces defs
+      in foldl (\clj (var, rep) -> replaceIdent var rep clj) v defs'
     convert other = other
     mkReplaces :: [Clj] -> [(Text, Clj)]
     mkReplaces [] = []

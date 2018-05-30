@@ -2,6 +2,7 @@ module PureClj.AST where
 
 import Prelude.Compat
 
+import Control.Arrow ((***))
 import Control.Monad ((>=>))
 import Control.Monad.Identity (Identity(..), runIdentity)
 import Data.Text (Text)
@@ -97,7 +98,7 @@ everywhere f = go where
   go (CljApp c cs) = f (CljApp (go c) (map go cs))
   go (CljDef t name c) = f (CljDef t name (go c))
   go (CljLet cs cs2) = f (CljLet (map go cs) (map go cs2))
-  go (CljCond kvs el) = f (CljCond (map (fmap go) kvs) (fmap go el))
+  go (CljCond kvs el) = f (CljCond (map (go *** go)  kvs) (fmap go el))
   go (CljThrow c) = f (CljThrow (go c))
   go other = f other
 
@@ -118,9 +119,12 @@ everywhereTopDownM f = f >=> go where
   go (CljApp c cs) = CljApp <$> f' c <*> traverse f' cs
   go (CljDef t name c) = CljDef t name <$> f' c
   go (CljLet cs cs2) = CljLet <$> traverse f' cs <*> traverse f' cs2
-  go (CljCond kvs el) = CljCond <$> (traverse (sndM f') kvs) <*> mapM f' el
+  go (CljCond kvs el) = CljCond <$> (traverse (mapTM f') kvs) <*> mapM f' el
   go (CljThrow c) = CljThrow <$> f' c
   go other = f other
 
 sndM :: (Functor f) => (b -> f c) -> (a, b) -> f (a, c)
 sndM f (a, b) = (,) a <$> f b
+
+mapTM :: (Applicative f) => (a -> f b) -> (a, a) -> f (b, b)
+mapTM f (a, b) = (,) <$> f a <*> f b
