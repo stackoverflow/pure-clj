@@ -47,7 +47,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
 
     makeForeignImport :: Ident -> Clj
     makeForeignImport ident =
-      CljDef (topType ident) (runIdent ident) (CljVar (Just "_foreign") (runIdent ident))
+      CljDef (topType ident) (identToClj ident) (CljVar (Just "_foreign") (runIdent ident))
 
     makeDeclares :: [Bind Ann] -> [Clj]
     makeDeclares binds =
@@ -305,7 +305,8 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
                   | otherwise = TopPvt
 
 isMain :: ModuleName -> Bool
-isMain (ModuleName [ProperName "Main"]) = True
+isMain (ModuleName []) = False
+isMain (ModuleName mns) | last mns == (ProperName "Main") = True
 isMain _ = False
 
 -- | Maps a tuple2 with the provided functions

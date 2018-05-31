@@ -87,6 +87,7 @@ isBuiltIn name =
   , "when"
   , "while"
   , "for"
+  , "cond"
   , "map"
   , "filter"
   , "reduce"
@@ -106,6 +107,7 @@ isBuiltIn name =
   , "apply"
   , "compare"
   , "assert"
+  , "read"
   ]
 
 -- | Checks if an operator exists in Clojure
