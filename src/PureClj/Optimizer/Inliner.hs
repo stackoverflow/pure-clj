@@ -20,7 +20,11 @@ shouldInline (CljCharLiteral _) = True
 shouldInline (CljBooleanLiteral _) = True
 shouldInline (CljArrayIndexer index val) = shouldInline index && shouldInline val
 shouldInline (CljAccessor _ val) = shouldInline val
-shouldInline (CljApp (CljKeywordLiteral _) [val]) = shouldInline val
+-- | keywords as functions = acessor, therefore safe if the parameter is safe
+shouldInline (CljApp (CljKeywordLiteral _) [par]) = shouldInline par
+-- | constructors are safe to inline if they parameters are safe
+shouldInline (CljApp (CljApp (CljKeywordLiteral "new") [var]) pars) =
+  shouldInline var && all shouldInline pars
 shouldInline _ = False
 
 shouldInlineDef :: Clj -> Bool
@@ -42,8 +46,10 @@ inlineVariables = everywhere convert
     convert (CljLet [] [v]) = v
     convert (CljLet [] vs) = CljApp (CljVar Nothing "do") vs
     convert (CljLet defs [v]) | any shouldInlineDef defs =
-      let defs' = mkReplaces defs
-      in foldl (\clj (var, rep) -> replaceIdent var rep clj) v defs'
+      let reps = mkReplaces (checkReassigns defs v)
+          remains = mkRemains (map fst reps) defs
+          v' = foldl (\clj (var, rep) -> replaceIdent var rep clj) v reps
+      in CljLet remains [v']
     convert other = other
     mkReplaces :: [Clj] -> [(Text, Clj)]
     mkReplaces [] = []
@@ -56,6 +62,19 @@ inlineVariables = everywhere convert
             Nothing -> m ++ [(var, v2)]
         checkDef m (CljDef LetDef var clj) | shouldInline clj = m ++ [(var, clj)]
         checkDef m _ = m
+    mkRemains :: [Text] -> [Clj] -> [Clj]
+    mkRemains vars defs = filter (go vars) defs
+      where
+        go :: [Text] -> Clj -> Bool
+        go vs (CljDef LetDef v _) = not $ elem v vs
+        go _ _ = True
+    checkReassigns :: [Clj] -> Clj -> [Clj]
+    checkReassigns [] _ = []
+    checkReassigns (d@(CljDef _ v _):vars) body =
+      if any (isReassigned v) (vars ++ [body])
+      then checkReassigns vars body
+      else d : checkReassigns vars body
+    checkReassigns _ _ = error "Received non-def on checkReassigns"
 
 inlineCommonValues :: Clj -> Clj
 inlineCommonValues = everywhere convert

@@ -137,7 +137,7 @@ pursOutputDirectory = Opts.strOption $
 jsonErrors :: Opts.Parser Bool
 jsonErrors = Opts.switch $
      Opts.long "json-errors"
-  <> Opts.help "Print errors to stderr as JSON"
+  <> Opts.help "Print purs errors to stderr as JSON"
 
 purscljMakeOptions :: Opts.Parser PurscljMakeOptions
 purscljMakeOptions =

@@ -1,41 +1,46 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main
   ( main
   ) where
 
 import Prelude.Compat
 
-import CoreFn
-import CoreFn.FromJSON
-import PureClj.AST
-import PureClj.CodeGen
-import PureClj.Printer (prettyPrintClj)
-
-import Data.Aeson
-import Data.Aeson.Types
-import Data.Version
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Char8 as B
-import qualified Data.Text.IO as TIO
 import Control.Monad.Supply
-import Control.Monad.Supply.Class
+import Data.Text (Text)
+import Test.Hspec
+
+import PureClj.AST
+import PureClj.Optimizer
 
 main :: IO ()
-main = do
-  contents <- readFile "test/resources/corefn_simple.json"
-  let parsed = decode $ toLazyStr contents :: Maybe Value
-  case parsed of
-    Just js -> do
-      let res = parseModule js
-      let res' = evalSupply 0 $ toClj res
-      putStrLn ""
-      TIO.putStrLn $ prettyPrintClj res'
-    Nothing -> print "nope"
-  where
-    toLazyStr = BL.fromStrict . B.pack
+main = hspec $ do
+  describe "Inline let variables" $ do
+    it "inline the right variables" $ do
+      checkInlines
+    it "doesn't inline reassigned variables" $ do
+      checkReassign
 
-    toClj :: (Monad m, MonadSupply m) => Result (a, Module Ann) -> m [Clj]
-    toClj (Success (_, m)) = moduleToClj m
-    toClj (Error s) = error $ "Failed while trying to decode json " ++ s
+checkInlines :: Expectation
+checkInlines =
+  let ex = CljDef LetDef "z" (CljApp (key "value") [var "Nothing"])
+      ex2 = CljDef LetDef "y" (CljApp (var "value") [var "Nothing"])
+      let' = CljLet [ex, ex2] [var "z"]
+      expected = CljLet [ex2] [CljApp (key "value") [var "Nothing"]]
+  in (optimize' let') `shouldBe` expected
 
-parseModule :: Value -> Result (Version, Module Ann)
-parseModule = parse moduleFromJSON
+checkReassign :: Expectation
+checkReassign =
+  let ex = CljDef LetDef "z" (CljStringLiteral "a")
+      ex2 = CljDef LetDef "z" (CljApp (var "value") [var "Nothing"])
+      let' = CljLet [ex, ex2] [var "z"]
+  in (optimize' let') `shouldBe` let'
+
+optimize' :: Clj -> Clj
+optimize' v = evalSupply 0 $ optimize v
+
+var :: Text -> Clj
+var x = CljVar Nothing x
+
+key :: Text -> Clj
+key x = CljKeywordLiteral x

@@ -123,6 +123,25 @@ everywhereTopDownM f = f >=> go where
   go (CljThrow c) = CljThrow <$> f' c
   go other = f other
 
+everything :: (r -> r -> r) -> (Clj -> r) -> Clj -> r
+everything (<>) f = go where
+  go c@(CljUnary _ c1) = f c <> go c1
+  go c@(CljBinary _ cs) = foldl (<>) (f c) (map go cs)
+  go c@(CljArrayLiteral cs) = foldl (<>) (f c) (map go cs)
+  go c@(CljArrayIndexer c1 c2) = f c <> go c1 <> go c2
+  go c@(CljAccessor _ c1) = f c <> go c1
+  go c@(CljObjectLiteral cs) = foldl (<>) (f c) (map (go . snd) cs)
+  go c@(CljObjectUpdate c1 cs) = foldl (<>) (f c <> go c1) (map (go . snd) cs)
+  go c@(CljFunction _ _ c1) = f c <> go c1
+  go c@(CljApp c1 cs) = foldl (<>) (f c <> go c1) (map go cs)
+  go c@(CljDef _ _ c1) = f c <> go c1
+  go c@(CljLet cs1 cs2) = foldl (<>) (foldl (<>) (f c) (map go cs1)) (map go cs2)
+  go c@(CljCond cs1 Nothing) =
+    let cljs = (map fst cs1) ++ (map snd cs1)
+    in foldl (<>) (f c) (map go cljs)
+  go c@(CljThrow c1) = f c <> go c1
+  go other = f other
+
 sndM :: (Functor f) => (b -> f c) -> (a, b) -> f (a, c)
 sndM f (a, b) = (,) a <$> f b
 
