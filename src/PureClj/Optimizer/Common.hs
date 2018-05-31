@@ -25,6 +25,13 @@ isReassigned var1 = everything (||) check
     check (CljDef _ var2 _) | var1 == var2 = True
     check _ = False
 
+isUsed :: Text -> Clj -> Bool
+isUsed var1 = everything (||) check
+  where
+    check :: Clj -> Bool
+    check (CljVar Nothing var) | var1 == var = True
+    check _ = False
+
 isDict :: (Text, Text) -> Clj -> Bool
 isDict (moduleName, dictName) (CljVar (Just y) x) =
   x == dictName && y == moduleName

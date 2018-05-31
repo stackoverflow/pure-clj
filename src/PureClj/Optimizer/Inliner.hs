@@ -5,6 +5,7 @@ import Prelude.Compat
 import qualified PureClj.Constants as C
 
 import Control.Monad.Supply.Class
+import Data.Monoid ((<>))
 import Data.String (IsString)
 import Data.Text (Text)
 
@@ -215,15 +216,29 @@ inlineUnsafePartial = everywhereTopDown convert where
     = CljApp comp [ CljVar Nothing C.nil ]
   convert other = other
 
--- | give names to functions defined in a `let`
--- | so they can be called recursively
-nameFunctions :: Clj -> Clj
-nameFunctions = everywhere name
+-- | work around Clojure lack of tail recursive lets
+nameLets :: Clj -> Clj
+nameLets = everywhere name
   where
     name :: Clj -> Clj
     name (CljDef LetDef var (CljFunction Nothing pars bd)) =
       CljDef LetDef var (CljFunction (Just var) pars bd)
+    name (CljLet defs [v]) = CljLet (go defs) [v]
     name x = x
+    go :: [Clj] -> [Clj]
+    go [] = []
+    go ((CljDef LetDef var clj) : defs) | isUsed var clj && shouldAtomize clj =
+      let atom = var <> "$atom" in
+      [ CljDef LetDef atom (CljApp (var' "atom") [(CljBooleanLiteral False)])
+      , (CljDef LetDef var (replaceIdent var (var' $ "@" <> atom) clj))
+      , CljDef LetDef var (CljApp (var' "reset!") [var' atom, var' var])]
+      ++ go defs
+    go others = others
+    shouldAtomize :: Clj -> Bool
+    shouldAtomize (CljFunction _ _ _) = False
+    shouldAtomize _ = True
+    var' :: Text -> Clj
+    var' x = CljVar Nothing x
 
 ringNumber :: forall a b. (IsString a, IsString b) => (a, b)
 ringNumber = (C.dataRing, C.ringNumber)

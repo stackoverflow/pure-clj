@@ -108,6 +108,10 @@ isBuiltIn name =
   , "compare"
   , "assert"
   , "read"
+  , "extend"
+  , "empty"
+  , "find"
+  , "sequence"
   ]
 
 -- | Checks if an operator exists in Clojure
