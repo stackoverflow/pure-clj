@@ -243,7 +243,10 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
           (conds', cljs) <- binderToClj argVar bind
           let argClj = letDef argVar (CljApp (CljKeywordLiteral . runIdent $ ident) [ctorVar])
           let letCond = CljLet [argClj]
-          return $ ([letCond conds'], argClj : cljs)
+          let conds'' = case conds' of
+                [c] -> [c]
+                cs -> [CljBinary And cs]
+          return $ ([letCond conds''], argClj : cljs)
     binderToClj _ ConstructorBinder{} = error "binderToClj: invalid ConstructorBinder"
 
     literalBinderToClj :: Text -> Literal (Binder Ann) -> m ([Clj], [Clj])
@@ -268,7 +271,10 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
               def = CljDef LetDef newVar accessor
               let' = case binder of
                        VarBinder{} -> [CljBooleanLiteral True]
-                       _ -> [CljLet [CljDef LetDef newVar accessor] conds]
+                       _ -> let conds' = case conds of
+                                  [c] -> [c]
+                                  cs -> [CljBinary And cs]
+                            in [CljLet [CljDef LetDef newVar accessor] conds']
           return (let', def : cljs')
 
     literalBinderToClj varName (ObjectLiteral bs) = do
@@ -284,7 +290,10 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
               def = CljDef LetDef newVar accessor
               let' = case binder of
                        VarBinder{} -> [CljBooleanLiteral True]
-                       _ -> [CljLet [CljDef LetDef newVar accessor] conds]
+                       _ -> let conds' = case conds of
+                                  [c] -> [c]
+                                  cs -> [CljBinary And cs]
+                            in [CljLet [CljDef LetDef newVar accessor] conds']
           return (let', def : cljs')
 
     -- | Generate a simple non-namespaced Clojure var

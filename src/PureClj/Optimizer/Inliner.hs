@@ -49,8 +49,10 @@ inlineVariables = everywhere convert
     convert (CljLet defs [v]) | any shouldInlineDef defs =
       let reps = mkReplaces (checkReassigns defs v)
           remains = mkRemains (map fst reps) defs
-          v' = foldl (\clj (var, rep) -> replaceIdent var rep clj) v reps
+          v' = foldl doReplace v (reverse reps)
       in CljLet remains [v']
+      where
+        doReplace clj (var, rep) = replaceIdent var rep clj
     convert other = other
     mkReplaces :: [Clj] -> [(Text, Clj)]
     mkReplaces [] = []
@@ -71,10 +73,9 @@ inlineVariables = everywhere convert
         go _ _ = True
     checkReassigns :: [Clj] -> Clj -> [Clj]
     checkReassigns [] _ = []
-    checkReassigns (d@(CljDef _ v _):vars) body =
-      if any (isReassigned v) (vars ++ [body])
-      then checkReassigns vars body
-      else d : checkReassigns vars body
+    checkReassigns ((CljDef _ v _):vars) body | any (isReassigned v) (vars ++ [body]) =
+      checkReassigns vars body
+    checkReassigns (d@(CljDef _ _ _):vars) body = d : checkReassigns vars body
     checkReassigns _ _ = error "Received non-def on checkReassigns"
 
 inlineCommonValues :: Clj -> Clj
