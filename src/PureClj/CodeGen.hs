@@ -31,7 +31,8 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       declares = makeDeclares decls
       foreigns' = makeForeignImport <$> foreigns
   definitions <- bindToClj True `mapM` decls
-  optimized <- mapM optimize $ concat definitions
+  let definitions' = addMain $ concat definitions
+  optimized <- mapM optimize definitions'
   return $ namespace : declares ++ foreigns' ++ optimized
   where
     shouldImport :: (Ann, ModuleName) -> Bool
@@ -66,11 +67,18 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
     bindToClj isTopLv (NonRec ann ident val) = return <$> exprToClj isTopLv (ann, ident) val
     bindToClj isTopLv (Rec vals) = forM vals (uncurry $ (exprToClj isTopLv))
 
+    addMain :: [Clj] -> [Clj]
+    addMain defs | isMain mn && hasMain defs =
+      let main = CljDef Top "-main" $
+                   CljFunction (Just "-main") ["& args"] (CljApp (CljVar Nothing "main") [])
+      in defs ++ [main]
+    addMain defs = defs
+
     exprToClj :: Bool -> (Ann, Ident) -> Expr Ann -> m Clj
-    exprToClj _ (_, (Ident "main")) expr
+    {-exprToClj _ (_, (Ident "main")) expr
       | isMain mn = do
           expr' <- valToClj expr
-          return $ CljDef Top "-main" $  CljFunction (Just "-main") ["& args"] (CljApp expr' [])
+          return $ CljDef Top "-main" $ CljFunction (Just "-main") ["& args"] (CljApp expr' [])-}
     exprToClj isTopLv (_, ident) expr = do
       let deft = if isTopLv then topType ident else LetDef
       expr' <- valToClj expr
@@ -308,6 +316,13 @@ isMain :: ModuleName -> Bool
 isMain (ModuleName []) = False
 isMain (ModuleName mns) | last mns == (ProperName "Main") = True
 isMain _ = False
+
+hasMain :: [Clj] -> Bool
+hasMain cljs = any hasMain' cljs
+  where
+    hasMain' :: Clj -> Bool
+    hasMain' (CljDef Top "main" _) = True
+    hasMain' _ = False
 
 -- | Maps a tuple2 with the provided functions
 mapT :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)

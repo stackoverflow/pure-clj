@@ -221,7 +221,7 @@ nameLets :: Clj -> Clj
 nameLets = everywhere name
   where
     name :: Clj -> Clj
-    name (CljDef LetDef var (CljFunction Nothing pars body))  | isUsed var body && not (var `elem` pars) =
+    name (CljDef LetDef var (CljFunction Nothing pars body)) | isUsed var body && not (var `elem` pars) =
       CljDef LetDef var (CljFunction (Just var) pars body)
     name (CljLet defs [v]) = CljLet (go defs) [v]
     name x = x
@@ -229,7 +229,7 @@ nameLets = everywhere name
     go [] = []
     go ((CljDef LetDef var clj) : defs) | isUsed var clj && shouldAtomize clj =
       let atom = var <> "$atom" in
-      [ CljDef LetDef atom (CljApp (var' "atom") [(CljBooleanLiteral False)])
+      [ CljDef LetDef atom (CljApp (var' "atom") [(var' "nil")])
       , (CljDef LetDef var (replaceIdent var (var' $ "@" <> atom) clj))
       , CljDef LetDef var (CljApp (var' "reset!") [var' atom, var' var])]
       ++ go defs
