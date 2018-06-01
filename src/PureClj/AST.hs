@@ -136,8 +136,11 @@ everything (<>) f = go where
   go c@(CljApp c1 cs) = foldl (<>) (f c <> go c1) (map go cs)
   go c@(CljDef _ _ c1) = f c <> go c1
   go c@(CljLet cs1 cs2) = foldl (<>) (foldl (<>) (f c) (map go cs1)) (map go cs2)
-  go c@(CljCond cs1 Nothing) =
-    let cljs = (map fst cs1) ++ (map snd cs1)
+  go c@(CljCond cs1 else') =
+    let else'' = case else' of
+          Nothing -> []
+          Just el -> [el]
+        cljs = (map fst cs1) ++ (map snd cs1) ++ else''
     in foldl (<>) (f c) (map go cljs)
   go c@(CljThrow c1) = f c <> go c1
   go other = f other

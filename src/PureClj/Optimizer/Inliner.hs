@@ -221,8 +221,8 @@ nameLets :: Clj -> Clj
 nameLets = everywhere name
   where
     name :: Clj -> Clj
-    name (CljDef LetDef var (CljFunction Nothing pars bd)) =
-      CljDef LetDef var (CljFunction (Just var) pars bd)
+    name (CljDef LetDef var (CljFunction Nothing pars body))  | isUsed var body && not (var `elem` pars) =
+      CljDef LetDef var (CljFunction (Just var) pars body)
     name (CljLet defs [v]) = CljLet (go defs) [v]
     name x = x
     go :: [Clj] -> [Clj]
