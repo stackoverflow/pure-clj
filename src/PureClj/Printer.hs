@@ -113,6 +113,21 @@ literals = mkPattern' match
           val' <- prettyPrintClj' val
           identString <- currentIndent
           return $ identString <> check' <> emit " " <> val'
+    match (CljIf cond then' else') = mconcat <$> sequence
+      [ return $ emit "(if "
+      , prettyPrintClj' cond
+      , return $ emit "\n"
+      , printIndented then'
+      , return $ emit "\n"
+      , printIndented else'
+      , return $ emit ")"
+      ]
+      where
+        printIndented :: (Emit gen) => Clj -> StateT PrinterState Maybe gen
+        printIndented clj = withIndent $ do
+          clj' <- prettyPrintClj' clj
+          indentStr <- currentIndent
+          return $ indentStr <> clj'
     match (CljObjectUpdate m keyvals) = mconcat <$> sequence
       [ return $ emit "(assoc "
       , prettyPrintClj' m

@@ -74,6 +74,7 @@ data Clj
   | CljApp Clj [Clj]
   | CljVar (Maybe Text) Text
   | CljCond [(Clj, Clj)] (Maybe Clj)
+  | CljIf Clj Clj Clj
   | CljDef DefType Text Clj
   | CljDeclare [Text]
   | CljLet [Clj] [Clj]
@@ -99,6 +100,7 @@ everywhere f = go where
   go (CljDef t name c) = f (CljDef t name (go c))
   go (CljLet cs cs2) = f (CljLet (map go cs) (map go cs2))
   go (CljCond kvs el) = f (CljCond (map (go *** go)  kvs) (fmap go el))
+  go (CljIf cond then' else') = f (CljIf (go cond) (go then') (go else'))
   go (CljThrow c) = f (CljThrow (go c))
   go other = f other
 
@@ -120,6 +122,7 @@ everywhereTopDownM f = f >=> go where
   go (CljDef t name c) = CljDef t name <$> f' c
   go (CljLet cs cs2) = CljLet <$> traverse f' cs <*> traverse f' cs2
   go (CljCond kvs el) = CljCond <$> (traverse (mapTM f') kvs) <*> mapM f' el
+  go (CljIf c c2 c3) = CljIf <$> f' c <*> f' c2 <*> f' c3
   go (CljThrow c) = CljThrow <$> f' c
   go other = f other
 
@@ -142,6 +145,7 @@ everything (<>) f = go where
           Just el -> [el]
         cljs = (map fst cs1) ++ (map snd cs1) ++ else''
     in foldl (<>) (f c) (map go cljs)
+  go c@(CljIf c1 c2 c3) = f c <> go c1 <> go c2 <> go c3
   go c@(CljThrow c1) = f c <> go c1
   go other = f other
 

@@ -241,6 +241,28 @@ nameLets = everywhere name
     var' :: Text -> Clj
     var' x = CljVar Nothing x
 
+-- | simplify `cond`s moving to `if`s and `and`s removing useless clauses
+simplifyConds :: Clj -> Clj
+simplifyConds = everywhere go where
+  go :: Clj -> Clj
+  go (CljBinary And [clause]) = clause
+  go (CljBinary And clauses) | any isTrue clauses = CljBinary And $ filter (not . isTrue) clauses
+  go (CljBinary And clauses) | any isAnd clauses = CljBinary And $ replaceAnds clauses
+    where
+      replaceAnds :: [Clj] -> [Clj]
+      replaceAnds [] = []
+      replaceAnds ((CljBinary And exprs):rest) = exprs ++ replaceAnds rest
+      replaceAnds (x:rest) = x : replaceAnds rest
+  go (CljCond [(CljBooleanLiteral True, expr)] _) = expr
+  go (CljCond [(check, expr), (CljBooleanLiteral True, expr2)] _) = CljIf check expr expr2
+  go other = other
+  isTrue :: Clj -> Bool
+  isTrue (CljBooleanLiteral True) = True
+  isTrue _ = False
+  isAnd :: Clj -> Bool
+  isAnd (CljBinary And _) = True
+  isAnd _ = False
+
 ringNumber :: forall a b. (IsString a, IsString b) => (a, b)
 ringNumber = (C.dataRing, C.ringNumber)
 

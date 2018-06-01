@@ -22,6 +22,7 @@ optimize clj = do
     tidyUp = applyAll $
       [ nameLets
       , etaConvert
+      , simplifyConds
       , inlineVariables
       ]
 
