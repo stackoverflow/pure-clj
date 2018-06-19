@@ -28,6 +28,7 @@ dependencies:
   - hspec
   - monad-control >= 1.0.0.0 && < 1.1
   - mtl
+  - parsec >= 3.1.13.0
   - pattern-arrows
   - text
   - transformers
