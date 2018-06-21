@@ -10,9 +10,8 @@ import qualified Options.Applicative as Opts
 
 import Control.Applicative (many)
 import Control.Monad
-import Data.Maybe (isJust)
 import Data.Monoid ((<>))
-import Data.List (intercalate, isSuffixOf, find)
+import Data.List (intercalate, isSuffixOf, sort)
 import Data.Text (Text)
 import System.Directory
 import System.Exit (ExitCode(..))
@@ -71,14 +70,24 @@ processForeigns m@Module{..} inputDirs outDir =
       let module' = runModuleNamePath moduleName
       globs <- mapM glob inputDirs
       mods <- mapM (hasForeign m) $ concat globs
-      let ffile = find isJust mods
-      case ffile of
-        Just (Just path) -> do
-          content <- readFileUTF8 path
-          let out = foldl (</>) outDir $ module' ++ ["_foreign.clj"]
-          putStrLn $ "Writing foreign " ++ out
-          writeOutput out content
-        _ -> error $ "No foreign file found for module " ++ (intercalate "." module')
+      let fpaths = foldl (\acc mb -> case mb of
+                             Just fp -> acc ++ [fp]
+                             Nothing -> acc) [] mods
+      case fpaths of
+        [] -> error $ "No foreign file found for module " ++ (intercalate "." module')
+        [path] -> handleForeign path module'
+        -- this is a rare case where one module
+        -- is a suffix of another. We take the shortest one
+        xs -> case sort xs of
+          (path:_) -> handleForeign path module'
+          _ -> error "Unreacheable code"
+  where
+    handleForeign :: FilePath -> [FilePath] -> IO ()
+    handleForeign path module' = do
+      content <- readFileUTF8 path
+      let out = foldl (</>) outDir $ module' ++ ["_foreign.clj"]
+      putStrLn $ "Writing foreign " ++ out
+      writeOutput out content
 
 hasForeign :: Module Ann -> FilePath -> IO (Maybe FilePath)
 hasForeign Module{..} input = do
