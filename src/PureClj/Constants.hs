@@ -212,6 +212,9 @@ pure' = "pure"
 discard :: forall a. (IsString a) => a
 discard = "discard"
 
+eff :: forall a. (IsString a) => a
+eff = "Control_Monad_Eff"
+
 effect :: forall a. (IsString a) => a
 effect = "Effect"
 

@@ -12,7 +12,6 @@ import Control.PatternArrows
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Numeric (showHex)
 
 import PureClj.AST
 import PureClj.Pretty.Common
@@ -24,22 +23,14 @@ prettyPrintSymbol :: Text -> Text
 prettyPrintSymbol s = foldMap encodeChar (T.unpack s)
   where
   encodeChar :: Char -> Text
-  encodeChar c | (fromEnum c) > 0xFF = "\\u" <> hex 4 c
-  encodeChar c | (fromEnum c) > 0x7E || (fromEnum c) < 0x20 = "\\x" <> hex 2 c
   encodeChar c | c == '\b' = "\\b"
   encodeChar c | c == '\t' = "\\t"
   encodeChar c | c == '\n' = "\\n"
-  encodeChar c | c == '\v' = "\\v"
   encodeChar c | c == '\f' = "\\f"
   encodeChar c | c == '\r' = "\\r"
   encodeChar c | c == '"'  = "\\\""
   encodeChar c | c == '\\' = "\\\\"
   encodeChar c = T.singleton $ c
-
-  hex :: (Enum a) => Int -> a -> Text
-  hex width c =
-    let hs = showHex (fromEnum c) "" in
-    T.pack (replicate (width - length hs) '0' <> hs)
 
 literals :: (Emit gen) => Pattern PrinterState Clj gen
 literals = mkPattern' match

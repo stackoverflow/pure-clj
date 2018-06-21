@@ -7,7 +7,7 @@ import Control.Monad.Supply.Class
 import PureClj.AST
 import PureClj.Optimizer.Common
 import PureClj.Optimizer.Inliner
---import PureClj.Optimizer.MagicDo
+import PureClj.Optimizer.MagicDo
 
 optimize :: MonadSupply m => Clj -> m Clj
 optimize clj = do
@@ -15,8 +15,9 @@ optimize clj = do
                             . inlineUnsafePartial . tidyUp . applyAll
                             [ inlineCommonValues
                             , inlineCommonOps ]) clj
-  untilFixedPoint (return . tidyUp) clj'
-    -- =<< untilFixedPoint (return . magicDo') clj'
+  untilFixedPoint (return . tidyUp)
+    =<< untilFixedPoint (return . magicDo')
+    =<< untilFixedPoint (return . magicDo) clj'
   where
     tidyUp :: Clj -> Clj
     tidyUp = applyAll $
