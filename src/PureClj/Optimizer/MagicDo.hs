@@ -28,8 +28,8 @@ magicDo'' effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   -- Desugar pure
   convert (CljApp (CljApp pure' [val]) []) | isPure pure' = val
   -- Desugar discard
-  convert (CljApp (CljApp bind [m]) [CljFunction Nothing [p] [clj]]) | isDiscard bind =
-    CljFunction (Just fnName) [p] $ [(CljApp m []), CljApp clj []]
+  convert (CljApp (CljApp bind [m]) [CljFunction Nothing [_] [clj]]) | isDiscard bind =
+    CljFunction (Just fnName) [] $ [(CljApp m []), CljApp clj []]
   -- Desugar bind
   {-convert (CljApp (CljApp bind [m]) [CljFunction Nothing [arg] clj]) | isBind bind =
     CljFunction (Just fnName) ["!!unused"] $ letDef arg (CljApp m []) (CljApp clj [])
@@ -40,7 +40,7 @@ magicDo'' effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   convert (App _ (App _ (App s1 f [arg1]) [arg2]) []) | isEffFunc C.whileE f =
     App s1 (Function s1 Nothing [] (Block s1 [ While s1 (App s1 arg1 []) (Block s1 [ App s1 arg2 [] ]), Return s1 $ ObjectLiteral s1 []])) []-}
   -- Inline __do returns
-  convert (CljFunction name ps fb@(reverse -> ((CljApp (CljFunction (Just ident) [_] body) []):_)))
+  convert (CljFunction name ps fb@(reverse -> ((CljApp (CljFunction (Just ident) _ body) []):_)))
     | ident == fnName = CljFunction name ps $ (butlast fb) ++ body
   -- Inline double applications
   {-convert (App _ (App s1 (Function s2 Nothing [] (Block ss body)) []) []) =
