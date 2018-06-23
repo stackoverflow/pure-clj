@@ -113,12 +113,6 @@ literals = mkPattern' match
       , printIndented else'
       , return $ emit ")"
       ]
-      where
-        printIndented :: (Emit gen) => Clj -> StateT PrinterState Maybe gen
-        printIndented clj = withIndent $ do
-          clj' <- prettyPrintClj' clj
-          indentStr <- currentIndent
-          return $ indentStr <> clj'
     match (CljObjectUpdate m keyvals) = mconcat <$> sequence
       [ return $ emit "(assoc "
       , prettyPrintClj' m
@@ -136,14 +130,11 @@ literals = mkPattern' match
       , maybe (return $ emit "") (\req' -> prettyPrintClj' req') req
       , return $ emit ")"
       ]
-    match (CljFunction mname args ret) = mconcat <$> sequence
+    match (CljFunction mname args rets) = mconcat <$> sequence
       [ return $ emit "(fn "
       , return $ emit $ (maybe "" (\name -> name <> " ") mname)
       , return $ emit $ "[" <> (intercalate " " args) <> "]\n"
-      , withIndent $ do
-          ret' <- prettyPrintClj' ret
-          indentString <- currentIndent
-          return $ indentString <> ret'
+      , intercalate (emit "\n") <$> forM rets printIndented
       , return $ emit ")"
       ]
     match (CljThrow throw) = do
@@ -151,6 +142,11 @@ literals = mkPattern' match
       return $ emit "(throw " <> throw' <> emit ")"
     match (CljNoOp) = return $ emit ""
     match _ = mzero
+    printIndented :: (Emit gen) => Clj -> StateT PrinterState Maybe gen
+    printIndented clj = withIndent $ do
+      clj' <- prettyPrintClj' clj
+      indentStr <- currentIndent
+      return $ indentStr <> clj'
 
 accessor :: Pattern PrinterState Clj (Text, Clj)
 accessor = mkPattern match

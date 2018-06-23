@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module PureClj.Optimizer.MagicDo where
 
@@ -27,21 +28,22 @@ magicDo'' effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   -- Desugar pure
   convert (CljApp (CljApp pure' [val]) []) | isPure pure' = val
   -- Desugar discard
-  convert (CljApp (CljApp bind [m]) [CljFunction Nothing [p] clj]) | isDiscard bind =
-    CljFunction (Just fnName) [p] $ CljApp m [CljApp clj []] --[p] : map applyReturns clj
+  convert (CljApp (CljApp bind [m]) [CljFunction Nothing [p] [clj]]) | isDiscard bind =
+    CljFunction (Just fnName) [p] $ [(CljApp m []), CljApp clj []]
   -- Desugar bind
-  convert (CljApp (CljApp bind [m]) [CljFunction Nothing [arg] clj]) | isBind bind =
+  {-convert (CljApp (CljApp bind [m]) [CljFunction Nothing [arg] clj]) | isBind bind =
     CljFunction (Just fnName) ["!!unused"] $ letDef arg (CljApp m []) (CljApp clj [])
   -- Desugar untilE
-  {-convert (App s1 (App _ f [arg]) []) | isEffFunc C.untilE f =
+  convert (App s1 (App _ f [arg]) []) | isEffFunc C.untilE f =
     App s1 (Function s1 Nothing [] (Block s1 [ While s1 (Unary s1 Not (App s1 arg [])) (Block s1 []), Return s1 $ ObjectLiteral s1 []])) []
   -- Desugar whileE
   convert (App _ (App _ (App s1 f [arg1]) [arg2]) []) | isEffFunc C.whileE f =
-    App s1 (Function s1 Nothing [] (Block s1 [ While s1 (App s1 arg1 []) (Block s1 [ App s1 arg2 [] ]), Return s1 $ ObjectLiteral s1 []])) []
+    App s1 (Function s1 Nothing [] (Block s1 [ While s1 (App s1 arg1 []) (Block s1 [ App s1 arg2 [] ]), Return s1 $ ObjectLiteral s1 []])) []-}
   -- Inline __do returns
-  convert (Return _ (App _ (Function _ (Just ident) [] body) [])) | ident == fnName = body
+  convert (CljFunction name ps fb@(reverse -> ((CljApp (CljFunction (Just ident) [_] body) []):_)))
+    | ident == fnName = CljFunction name ps $ (butlast fb) ++ body
   -- Inline double applications
-  convert (App _ (App s1 (Function s2 Nothing [] (Block ss body)) []) []) =
+  {-convert (App _ (App s1 (Function s2 Nothing [] (Block ss body)) []) []) =
     App s1 (Function s2 Nothing [] (Block ss (applyReturns `fmap` body))) []-}
   convert other = other
   -- Check if an expression represents a monomorphic call to >>= for the Eff monad
@@ -67,3 +69,7 @@ magicDo'' effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   isEffFunc _ _ = False
   -- create a let bind
   letDef var val clj = CljLet [CljDef LetDef var val] [clj]
+
+-- | take all but the last element of a list
+butlast :: [a] -> [a]
+butlast xs = take ((length xs) - 1) xs

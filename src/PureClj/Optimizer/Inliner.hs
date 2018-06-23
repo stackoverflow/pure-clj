@@ -36,7 +36,7 @@ etaConvert :: Clj -> Clj
 etaConvert = everywhere convert
   where
     convert :: Clj -> Clj
-    convert (CljFunction _ [p] (CljApp (CljVar ns v) [(CljVar Nothing p2)])) | p == p2 =
+    convert (CljFunction _ [p] [(CljApp (CljVar ns v) [(CljVar Nothing p2)])]) | p == p2 =
       CljVar ns v
     convert other = other
 
@@ -189,10 +189,10 @@ inlineFnComposition = everywhereTopDownM convert where
   convert (CljApp (CljApp (CljApp fn [dict']) [x]) [y])
     | isFnCompose dict' fn = do
         arg <- freshName
-        return $ CljFunction Nothing [arg] (CljApp x [CljApp y [CljVar Nothing arg]])
+        return $ CljFunction Nothing [arg] [(CljApp x [CljApp y [CljVar Nothing arg]])]
     | isFnComposeFlipped dict' fn = do
         arg <- freshName
-        return $ CljFunction Nothing [arg] (CljApp y [CljApp x [CljVar Nothing arg]])
+        return $ CljFunction Nothing [arg] [(CljApp y [CljApp x [CljVar Nothing arg]])]
   convert other = return other
   isFnCompose :: Clj -> Clj -> Bool
   isFnCompose dict' fn = isDict semigroupoidFn dict' && isDict fnCompose fn
@@ -222,8 +222,8 @@ nameLets :: Clj -> Clj
 nameLets = everywhere name
   where
     name :: Clj -> Clj
-    name (CljDef LetDef var (CljFunction Nothing pars body)) | isUsed var body && not (var `elem` pars) =
-      CljDef LetDef var (CljFunction (Just var) pars body)
+    name (CljDef LetDef var (CljFunction Nothing pars [body])) | isUsed var body && not (var `elem` pars) =
+      CljDef LetDef var (CljFunction (Just var) pars [body])
     name (CljLet defs [v]) = CljLet (go defs) [v]
     name x = x
     go :: [Clj] -> [Clj]

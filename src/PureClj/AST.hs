@@ -70,7 +70,7 @@ data Clj
   | CljBinary BinaryOperator [Clj]
   | CljArrayIndexer Clj Clj
   | CljAccessor KeyType Clj
-  | CljFunction (Maybe Text) [Text] Clj
+  | CljFunction (Maybe Text) [Text] [Clj]
   | CljApp Clj [Clj]
   | CljVar (Maybe Text) Text
   | CljCond [(Clj, Clj)] (Maybe Clj)
@@ -95,7 +95,7 @@ everywhere f = go where
   go (CljArrayIndexer c c2) = f (CljArrayIndexer (go c) (go c2))
   go (CljObjectUpdate c kvs) = f (CljObjectUpdate (go c) (map (fmap go) kvs))
   go (CljAccessor kt c) = f (CljAccessor kt (go c))
-  go (CljFunction n ps c) = f (CljFunction n ps (go c))
+  go (CljFunction n ps c) = f (CljFunction n ps (map go c))
   go (CljApp c cs) = f (CljApp (go c) (map go cs))
   go (CljDef t name c) = f (CljDef t name (go c))
   go (CljLet cs cs2) = f (CljLet (map go cs) (map go cs2))
@@ -117,7 +117,7 @@ everywhereTopDownM f = f >=> go where
   go (CljArrayIndexer c c2) = CljArrayIndexer <$> f' c <*> f' c2
   go (CljObjectUpdate c kvs) = CljObjectUpdate <$> f' c <*> traverse (sndM f') kvs
   go (CljAccessor kt c) = CljAccessor kt <$> f' c
-  go (CljFunction n ps c) = CljFunction n ps <$> f' c
+  go (CljFunction n ps c) = CljFunction n ps <$> traverse f' c
   go (CljApp c cs) = CljApp <$> f' c <*> traverse f' cs
   go (CljDef t name c) = CljDef t name <$> f' c
   go (CljLet cs cs2) = CljLet <$> traverse f' cs <*> traverse f' cs2
@@ -135,7 +135,7 @@ everything (<>) f = go where
   go c@(CljAccessor _ c1) = f c <> go c1
   go c@(CljObjectLiteral cs) = foldl (<>) (f c) (map (go . snd) cs)
   go c@(CljObjectUpdate c1 cs) = foldl (<>) (f c <> go c1) (map (go . snd) cs)
-  go c@(CljFunction _ _ c1) = f c <> go c1
+  go c@(CljFunction _ _ c1) = foldl (<>) (f c) (map go c1)
   go c@(CljApp c1 cs) = foldl (<>) (f c <> go c1) (map go cs)
   go c@(CljDef _ _ c1) = f c <> go c1
   go c@(CljLet cs1 cs2) = foldl (<>) (foldl (<>) (f c) (map go cs1)) (map go cs2)

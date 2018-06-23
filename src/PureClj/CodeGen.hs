@@ -70,7 +70,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
     addMain :: [Clj] -> [Clj]
     addMain defs | isMain mn && hasMain defs =
       let main = CljDef Top "-main" $
-                   CljFunction (Just "-main") ["& args"] (CljApp (CljVar Nothing "main") [])
+                   CljFunction (Just "-main") ["& args"] [(CljApp (CljVar Nothing "main") [])]
       in defs ++ [main]
     addMain defs = defs
 
@@ -106,7 +106,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
     valToClj lam@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) =
       let args = unAbs lam
           identArgs = identToClj <$> args
-      in return $ CljFunction Nothing identArgs (CljObjectLiteral $ toEntry <$> args)
+      in return $ CljFunction Nothing identArgs [(CljObjectLiteral $ toEntry <$> args)]
       where
         unAbs :: Expr Ann -> [Ident]
         unAbs (Abs _ arg val) = arg : unAbs val
@@ -119,7 +119,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       let cljArgs = case arg of
             UnusedIdent -> []
             _           -> [identToClj arg]
-      return $ CljFunction Nothing cljArgs ret
+      return $ CljFunction Nothing cljArgs [ret]
     valToClj ap@App{} = do
       let (f, args) = unApp ap []
       args' <- mapM valToClj args
@@ -147,7 +147,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
     valToClj (Constructor (_, _, _, Just IsNewtype) _ (ProperName ctor) _) =
       return $ CljDef LetDef (properToClj ctor) $
                  CljObjectLiteral [(KeyWord "create",
-                                    CljFunction Nothing ["value"] (var' "value"))]
+                                    CljFunction Nothing ["value"] [(var' "value")])]
     valToClj (Constructor _ _ (ProperName ctor) []) =
       return $ CljObjectLiteral [ (KeyWord "class", CljApp (var' "defrecord") [(var' $ ctor <> "Class"), CljArrayLiteral []])
                                 , (KeyWord "value", CljApp (var' ("->" <> ctor <> "Class")) [])]
@@ -155,7 +155,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       let vars = identToClj <$> fields
           vars' = var' <$> vars
           new = var' $ "->" <> ctor <> "Class"
-          createFn = foldr (\f inner -> CljFunction Nothing [f] inner) (CljApp new vars') vars
+          createFn = foldr (\f inner -> CljFunction Nothing [f] [inner]) (CljApp new vars') vars
       in return $ CljObjectLiteral [ (KeyWord "class", CljApp (var' "defrecord") [(var' $ ctor <> "Class"), CljArrayLiteral vars'])
                                    , (KeyWord "new", new)
                                    , (KeyWord "create", createFn)]
