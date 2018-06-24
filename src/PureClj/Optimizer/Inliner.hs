@@ -154,6 +154,9 @@ inlineCommonOps = everywhereTopDown $ applyAll $
   , binary' C.dataIntBits C.shr ShiftRight
   , binary' C.dataIntBits C.zshr UnsignedShiftRight
   , unary' C.dataIntBits C.complement BitwiseNot
+
+  , inlineNonClassFunction (isModFn (C.dataFunction, C.apply)) $ \f x -> CljApp f [x]
+  , inlineNonClassFunction (isModFn (C.dataFunction, C.applyFlipped)) $ \x f -> CljApp f [x]
   ]
   where
     binary :: (Text, Text) -> (Text, Text) -> BinaryOperator -> Clj -> Clj
@@ -179,6 +182,14 @@ inlineCommonOps = everywhereTopDown $ applyAll $
       convert :: Clj -> Clj
       convert (CljApp fn [x]) | isDict (moduleName, fnName) fn = CljUnary op x
       convert other = other
+    inlineNonClassFunction :: (Clj -> Bool) -> (Clj -> Clj -> Clj) -> Clj -> Clj
+    inlineNonClassFunction p f = convert where
+      convert :: Clj -> Clj
+      convert (CljApp (CljApp op' [x]) [y]) | p op' = f x y
+      convert other = other
+    isModFn :: (Text, Text) -> Clj -> Bool
+    isModFn (m, op) (CljVar (Just m') op') = m == m' && op == op'
+    isModFn _ _ = False
 
 inlineFnComposition :: forall m. MonadSupply m => Clj -> m Clj
 inlineFnComposition = everywhereTopDownM convert where
@@ -230,7 +241,7 @@ nameLets = everywhere name
     go [] = []
     go ((CljDef LetDef var clj) : defs) | isUsed var clj && shouldAtomize clj =
       let atom = var <> "$atom" in
-      [ CljDef LetDef atom (CljApp (var' "atom") [(var' "nil")])
+      [ CljDef LetDef atom (CljApp (var' "atom") [(var' C.nil)])
       , (CljDef LetDef var (replaceIdent var (var' $ "@" <> atom) clj))
       , CljDef LetDef var (CljApp (var' "reset!") [var' atom, var' var])]
       ++ go defs

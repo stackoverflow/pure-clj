@@ -173,6 +173,9 @@ app = mkPattern' match
   match (CljUnary Negate val) = do
     cljs <- traverse prettyPrintClj' [val]
     return (intercalate (emit " ") cljs, CljVar Nothing "-")
+  match (CljUnary BitwiseNot val) = do
+    cljs <- traverse prettyPrintClj' [val]
+    return (intercalate (emit " ") cljs, CljVar Nothing "bit-not")
   match (CljBinary op vals) = do
     cljs <- traverse prettyPrintClj' vals
     return (intercalate (emit " ") cljs, CljVar Nothing (binaryTable op))

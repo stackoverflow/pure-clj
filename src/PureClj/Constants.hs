@@ -5,6 +5,12 @@ module PureClj.Constants where
 import Data.String (IsString)
 import Data.Text (Text)
 
+apply :: forall a. (IsString a) => a
+apply = "!!apply"
+
+applyFlipped :: forall a. (IsString a) => a
+applyFlipped = "applyFlipped"
+
 dataRing :: forall a. (IsString a) => a
 dataRing = "Data.Ring"
 
@@ -31,6 +37,9 @@ dataIntBits = "Data.Int.Bits"
 
 dataBounded :: forall a. (IsString a) => a
 dataBounded = "Data.Bounded"
+
+dataFunction :: forall a. (IsString a) => a
+dataFunction = "Data.Function"
 
 controlSemigroupoid :: forall a. (IsString a) => a
 controlSemigroupoid = "Control.Semigroupoid"
@@ -141,19 +150,19 @@ discardUnitDictionary :: forall a. (IsString a) => a
 discardUnitDictionary = "discardUnit"
 
 conj :: forall a. (IsString a) => a
-conj = "conj"
+conj = "!!conj"
 
 disj :: forall a. (IsString a) => a
-disj = "disj"
+disj = "!!disj"
 
 not :: forall a. (IsString a) => a
-not = "not"
+not = "!!not"
 
 or :: forall a. (IsString a) => a
-or = "or"
+or = "!!or"
 
 and :: forall a. (IsString a) => a
-and = "and"
+and = "!!and"
 
 xor :: forall a. (IsString a) => a
 xor = "xor"
@@ -168,7 +177,7 @@ zshr :: forall a. (IsString a) => a
 zshr = "zshr"
 
 complement :: forall a. (IsString a) => a
-complement = "complement"
+complement = "!!complement"
 
 zero :: forall a. (IsString a) => a
 zero = "zero"
