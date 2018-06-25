@@ -78,20 +78,26 @@ parseParamName = do
 
 parseNumber :: Parser CljVal
 parseNumber = do
-  x <- try parseFloat <|> parseLong
+  x <- try parseBin <|> try parseHex <|> try parseFloat <|> parseLong
   return $ Number x
   where
     parseLong = longPlus <|> longMinus <|> long
       where
-        long = int <* oneOf "lL"
+        long = try (int <* oneOf "lLnN") <|> int
         longMinus = char '-' <:> long
         longPlus = char '+' *> long
-    parseFloat = plus <|> minus <|> number
+    parseFloat = try infinity <|> try nan <|> plus <|> minus <|> number
       where
         number :: Parser String
         number = int <++> ((char '.') <:> option "" int) <++> (option "" $ oneOf "eE" <:> (minusInt <|> int))
         plus = char '+' *> number
         minus = char '-' <:> number
+        infinity :: Parser String
+        infinity = string "-Infinity" <|> string "Infinity"
+        nan :: Parser String
+        nan = string "-NaN" <|> string "NaN"
+    parseHex = char '0' <:> (oneOf "xX" <:> many1 hexDigit)
+    parseBin = char '0' <:> (oneOf "bB" <:> many1 (oneOf "01"))
     int = many1 digit
     minusInt = char '-' <:> int
 
@@ -120,7 +126,7 @@ parseSymbol = do
 
 parseList' :: Parser [CljVal]
 parseList' = do
-  xs <- sepBy parseClojure spaces
+  xs <- sepBy parseDef spaces
   return xs
 
 parseList :: Parser CljVal
@@ -145,9 +151,9 @@ parseMap = do
   return $ Map kvs
   where
     parseKV = do
-      k <- parseClojure
+      k <- parseDef
       _ <- spaces
-      v <- parseClojure
+      v <- parseDef
       return (k, v)
 
 parseSet :: Parser CljVal
@@ -191,37 +197,37 @@ parseHostExpr = do
 parseDiscard :: Parser CljVal
 parseDiscard = do
   _ <- string "#_"
-  x <- parseClojure
+  x <- parseDef
   return $ Discard x
 
 parseDeref :: Parser CljVal
 parseDeref = do
   _ <- char '@'
-  x <- parseClojure
+  x <- parseDef
   return $ Deref x
 
 parseQuote :: Parser CljVal
 parseQuote = do
   _ <- char '\''
-  x <- parseClojure
+  x <- parseDef
   return $ Quote x
 
 parseUnquote :: Parser CljVal
 parseUnquote = do
   _ <- char '~'
-  x <- parseClojure
+  x <- parseDef
   return $ Unquote x
 
 parseBacktick :: Parser CljVal
 parseBacktick = do
   _ <- char '`'
-  x <- parseClojure
+  x <- parseDef
   return $ Backtick x
 
 parseUnquoteSplice :: Parser CljVal
 parseUnquoteSplice = do
   _ <- string "~@"
-  x <- parseClojure
+  x <- parseDef
   return $ UnquoteSplice x
 
 parseGensym :: Parser CljVal
@@ -241,8 +247,8 @@ parseTildes :: Parser CljVal
 parseTildes = try parseUnquoteSplice
   <|> try parseUnquote
 
-parseClojure :: Parser CljVal
-parseClojure = try parseNumber
+parseDef :: Parser CljVal
+parseDef = try parseNumber
   <|> parseSymbol
   <|> parseString
   <|> parseKeyword
@@ -257,10 +263,10 @@ parseClojure = try parseNumber
   <|> parseQuote
   <|> parseBacktick
 
+parseClojure :: String -> Either ParseError [CljVal]
+parseClojure s = parse (many1 parseDef) "" s
+
 (<++>) :: Applicative f => f [a] -> f [a] -> f [a]
 (<++>) a b = (++) <$> a <*> b
 (<:>) :: Applicative f => f a -> f [a] -> f [a]
 (<:>) a b = (:) <$> a <*> b
-
-oneOfStr :: String -> Parser String
-oneOfStr s = (oneOf s) <:> (string "")
