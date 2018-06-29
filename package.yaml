@@ -32,6 +32,7 @@ dependencies:
   - pattern-arrows
   - text
   - transformers
+  - utf8-string
   - vector
 
 library:

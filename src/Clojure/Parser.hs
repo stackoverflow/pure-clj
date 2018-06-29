@@ -266,6 +266,14 @@ parseDef = try parseNumber
 parseClojure :: String -> Either ParseError [CljVal]
 parseClojure s = parse (many1 parseDef) "" s
 
+checkDefinitions :: [CljVal] -> [String] -> Bool
+checkDefinitions clj foreigns = all checkDefinition foreigns
+  where
+    checkDefinition :: String -> Bool
+    checkDefinition foreign' = all (checkTopLevel foreign') clj
+    checkTopLevel :: String -> CljVal -> Bool
+    checkTopLevel foreign' clj' = True
+
 (<++>) :: Applicative f => f [a] -> f [a] -> f [a]
 (<++>) a b = (++) <$> a <*> b
 (<:>) :: Applicative f => f a -> f [a] -> f [a]
