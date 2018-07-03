@@ -16,3 +16,6 @@ writeFileUTF8 path text = BS.writeFile path (TE.encodeUtf8 text)
 
 readFileUTF8asString :: FilePath -> IO String
 readFileUTF8asString file = fmap BSUTF8.toString (BS.readFile file)
+
+writeFileUTF8asString :: FilePath -> String -> IO ()
+writeFileUTF8asString path text = BS.writeFile path (BSUTF8.fromString text)

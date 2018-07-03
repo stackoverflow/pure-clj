@@ -8,6 +8,7 @@ import Prelude.Compat
 
 import qualified Options.Applicative as Opts
 
+import Clojure.Parser (parseClojure, checkForeign)
 import Control.Applicative (many)
 import Control.Monad
 import Data.Monoid ((<>))
@@ -17,7 +18,7 @@ import System.Directory
 import System.Exit (ExitCode(..))
 import System.FilePath ((</>), (<.>), takeDirectory, dropExtension)
 import System.FilePath.Glob (glob)
-import System.IO.UTF8 (readFileUTF8, writeFileUTF8)
+import System.IO.UTF8 (readFileUTF8, writeFileUTF8, readFileUTF8asString, writeFileUTF8asString)
 import System.Process (readProcessWithExitCode)
 
 import PureClj.Build
@@ -84,10 +85,20 @@ processForeigns m@Module{..} inputDirs outDir =
   where
     handleForeign :: FilePath -> [FilePath] -> IO ()
     handleForeign path module' = do
-      content <- readFileUTF8 path
-      let out = foldl (</>) outDir $ module' ++ ["_foreign.clj"]
-      putStrLn $ "Writing foreign " ++ out
-      writeOutput out content
+      content <- readFileUTF8asString path
+      let parsed = parseClojure content
+          mname = intercalate "." module'
+      case parsed of
+        Left e -> error $ "Could not parse foreign module " ++ mname ++ ":\n"  ++ (show e)
+        Right cljs -> do
+          let foreigns = map (show . runIdent) moduleForeign
+              ffails = filter (not . checkForeign cljs) foreigns
+          case ffails of
+            [] -> do let out = foldl (</>) outDir $ module' ++ ["_foreign.clj"]
+                     putStrLn $ "Writing foreign " ++ out
+                     writeStringOutput out content
+            fails -> error $ "Could not find foreign definitions " ++ (show fails)
+                             ++ " for module " ++ mname
 
 hasForeign :: Module Ann -> FilePath -> IO (Maybe FilePath)
 hasForeign Module{..} input = do
@@ -102,6 +113,14 @@ hasForeign Module{..} input = do
         then return $ Just file
         else return Nothing
     _ -> return Nothing
+
+writeStringOutput :: FilePath -> String -> IO ()
+writeStringOutput path content = do
+  mkdir path
+  writeFileUTF8asString path content
+  where
+    mkdir :: FilePath -> IO ()
+    mkdir = createDirectoryIfMissing True . takeDirectory
 
 writeOutput :: FilePath -> Text -> IO ()
 writeOutput path content = do

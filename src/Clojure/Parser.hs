@@ -2,7 +2,7 @@
 
 module Clojure.Parser
   ( parseClojure
-  , checkForeigns
+  , checkForeign
   , CljVal(..) ) where
 
 import Prelude.Compat
@@ -285,8 +285,8 @@ parseDefs = do
 parseClojure :: String -> Either ParseError [CljVal]
 parseClojure s = parse parseDefs "" s
 
-checkForeigns :: [CljVal] -> [String] -> Bool
-checkForeigns cljs foreigns = all checkDefinition foreigns
+checkForeign :: [CljVal] -> String -> Bool
+checkForeign cljs foreign' = any (checkPubDef foreign') cljs
   where
     isDef v = v == "def" || v == "defn"
 
@@ -294,14 +294,11 @@ checkForeigns cljs foreigns = all checkDefinition foreigns
     isPvt (Metadata (Map [(Keyword "private", Boolean True)])) = True
     isPvt _ = False
 
-    checkDefinition :: String -> Bool
-    checkDefinition foreign' = any (checkTopLevel foreign') cljs
-
-    checkTopLevel :: String -> CljVal -> Bool
-    checkTopLevel v (List (Symbol def : Symbol sym : _)) | isDef def && sym == v = True
-    checkTopLevel v (List (Symbol def : clj : Symbol sym : _))
+    checkPubDef :: String -> CljVal -> Bool
+    checkPubDef v (List (Symbol def : Symbol sym : _)) | isDef def && sym == v = True
+    checkPubDef v (List (Symbol def : clj : Symbol sym : _))
       | isDef def && sym == v && not (isPvt clj) = True
-    checkTopLevel _ _ = False
+    checkPubDef _ _ = False
 
 (<++>) :: Applicative f => f [a] -> f [a] -> f [a]
 (<++>) a b = (++) <$> a <*> b
