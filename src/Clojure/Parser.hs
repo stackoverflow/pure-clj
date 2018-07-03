@@ -2,7 +2,7 @@
 
 module Clojure.Parser
   ( parseClojure
-  , checkDefinitions
+  , checkForeigns
   , CljVal(..) ) where
 
 import Prelude.Compat
@@ -285,8 +285,8 @@ parseDefs = do
 parseClojure :: String -> Either ParseError [CljVal]
 parseClojure s = parse parseDefs "" s
 
-checkDefinitions :: [CljVal] -> [String] -> Bool
-checkDefinitions cljs foreigns = all checkDefinition foreigns
+checkForeigns :: [CljVal] -> [String] -> Bool
+checkForeigns cljs foreigns = all checkDefinition foreigns
   where
     isDef v = v == "def" || v == "defn"
 
@@ -298,8 +298,8 @@ checkDefinitions cljs foreigns = all checkDefinition foreigns
     checkDefinition foreign' = any (checkTopLevel foreign') cljs
 
     checkTopLevel :: String -> CljVal -> Bool
-    checkTopLevel v (List [Symbol def, Symbol sym]) | isDef def && sym == v = True
-    checkTopLevel v (List [Symbol def, clj, Symbol sym])
+    checkTopLevel v (List (Symbol def : Symbol sym : _)) | isDef def && sym == v = True
+    checkTopLevel v (List (Symbol def : clj : Symbol sym : _))
       | isDef def && sym == v && not (isPvt clj) = True
     checkTopLevel _ _ = False
 
