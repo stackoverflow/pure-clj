@@ -10,6 +10,7 @@ import Control.Monad.Supply
 import Data.Text (Text)
 import Test.Hspec
 
+import Test.Parser
 import PureClj.AST
 import PureClj.Optimizer
 
@@ -20,6 +21,7 @@ main = hspec $ do
       checkInlines
     it "doesn't inline reassigned variables" $ do
       checkReassign
+  parserTest
 
 checkInlines :: Expectation
 checkInlines =

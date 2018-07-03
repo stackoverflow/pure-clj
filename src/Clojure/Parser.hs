@@ -1,5 +1,9 @@
 -- | Simple (and probably incomplete) Clojure parser
-module Clojure.Parser where
+
+module Clojure.Parser
+  ( parseClojure
+  , checkDefinitions
+  , CljVal(..) ) where
 
 import Prelude.Compat
 
@@ -34,11 +38,14 @@ data CljVal
   | Backtick CljVal
   | Unquote CljVal
   | UnquoteSplice CljVal
-  | Gensym CljVal
+  | Gensym String
   deriving (Read, Show, Eq)
 
+spaces' :: Parser Char
+spaces' = space <|> char ',' <|> char '\r' <|> char '\n'
+
 spaces :: Parser ()
-spaces = skipMany1 (space <|> char ',')
+spaces = skipMany1 spaces'
 
 parseKeyword :: Parser CljVal
 parseKeyword = do
@@ -107,9 +114,12 @@ parseName :: Parser String
 parseName = parseHead <:> (option "" $ many parseRest <++> (option "" $ char ';' <:> many1 parseRest))
   where
     parseHead :: Parser Char
-    parseHead = noneOf "0123456789^`'\"#~@:/%()[]{}\n\r\t \\"
+    parseHead = noneOf "0123456789^`'\"#~@:/%()[]{}\n\r\t \\,"
     parseRest :: Parser Char
     parseRest = parseHead <|> digit <|> char '.'
+
+parseSymbol' :: Parser String
+parseSymbol' = string "." <|> string "/" <|> parseName
 
 parseSymbol :: Parser CljVal
 parseSymbol = do
@@ -119,14 +129,13 @@ parseSymbol = do
     "true" -> Boolean True
     "false" -> Boolean False
     a -> Symbol a
-  where
-    parseSymbol' = string "." <|> string "/" <|> parseName
 
 -- Data structures
 
 parseList' :: Parser [CljVal]
 parseList' = do
-  xs <- sepBy parseDef spaces
+  skipMany spaces'
+  xs <- sepEndBy parseDef spaces
   return xs
 
 parseList :: Parser CljVal
@@ -146,7 +155,8 @@ parseVector = do
 parseMap :: Parser CljVal
 parseMap = do
   _ <- char '{'
-  kvs <- sepBy parseKV spaces
+  skipMany spaces'
+  kvs <- sepEndBy parseKV spaces
   _ <- char '}'
   return $ Map kvs
   where
@@ -231,7 +241,10 @@ parseUnquoteSplice = do
   return $ UnquoteSplice x
 
 parseGensym :: Parser CljVal
-parseGensym = undefined
+parseGensym = do
+  sym <- parseSymbol'
+  _ <- char '#'
+  return $ Gensym (sym ++ "#")
 
 parseHashes :: Parser CljVal
 parseHashes = try parseSet
@@ -250,6 +263,7 @@ parseTildes = try parseUnquoteSplice
 parseDef :: Parser CljVal
 parseDef = try parseNumber
   <|> parseSymbol
+  <|> try parseGensym
   <|> parseString
   <|> parseKeyword
   <|> parseChar
@@ -263,16 +277,31 @@ parseDef = try parseNumber
   <|> parseQuote
   <|> parseBacktick
 
+parseDefs :: Parser [CljVal]
+parseDefs = do
+  skipMany spaces'
+  sepEndBy parseDef spaces
+
 parseClojure :: String -> Either ParseError [CljVal]
-parseClojure s = parse (many1 parseDef) "" s
+parseClojure s = parse parseDefs "" s
 
 checkDefinitions :: [CljVal] -> [String] -> Bool
-checkDefinitions clj foreigns = all checkDefinition foreigns
+checkDefinitions cljs foreigns = all checkDefinition foreigns
   where
+    isDef v = v == "def" || v == "defn"
+
+    isPvt (Tag (Keyword "private")) = True
+    isPvt (Metadata (Map [(Keyword "private", Boolean True)])) = True
+    isPvt _ = False
+
     checkDefinition :: String -> Bool
-    checkDefinition foreign' = all (checkTopLevel foreign') clj
+    checkDefinition foreign' = any (checkTopLevel foreign') cljs
+
     checkTopLevel :: String -> CljVal -> Bool
-    checkTopLevel foreign' clj' = True
+    checkTopLevel v (List [Symbol def, Symbol sym]) | isDef def && sym == v = True
+    checkTopLevel v (List [Symbol def, clj, Symbol sym])
+      | isDef def && sym == v && not (isPvt clj) = True
+    checkTopLevel _ _ = False
 
 (<++>) :: Applicative f => f [a] -> f [a] -> f [a]
 (<++>) a b = (++) <$> a <*> b
