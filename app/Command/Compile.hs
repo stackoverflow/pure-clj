@@ -89,7 +89,7 @@ processForeigns m@Module{..} inputDirs outDir =
       let parsed = parseClojure content
           mname = intercalate "." module'
       case parsed of
-        Left e -> error $ "Could not parse foreign module " ++ mname ++ ":\n"  ++ (show e)
+        Left e -> error $ "Could not parse foreign module " ++ mname ++ " path: " ++ path ++ ":\n"  ++ (show e)
         Right cljs -> do
           let foreigns = map (unpack . runIdent) moduleForeign
               ffails = filter (not . hasForeign cljs) foreigns
@@ -98,7 +98,7 @@ processForeigns m@Module{..} inputDirs outDir =
                      putStrLn $ "Writing foreign " ++ out
                      writeStringOutput out content
             fails -> error $ "Could not find foreign definitions: " ++ (intercalate " " fails)
-                             ++ " for module " ++ mname
+                             ++ " for module: " ++ mname ++ " path: " ++ path
 
 foreignExists :: Module Ann -> FilePath -> IO (Maybe FilePath)
 foreignExists Module{..} input = do

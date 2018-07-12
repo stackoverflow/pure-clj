@@ -19,6 +19,7 @@ data CljVal
   | Keyword String
   | Symbol String
   | ParamName String
+  | Comment String
   -- | Data structures
   | List [CljVal]
   | Vector [CljVal]
@@ -47,11 +48,11 @@ spaces' = space <|> char ',' <|> char '\r' <|> char '\n'
 spaces :: Parser ()
 spaces = skipMany1 spaces'
 
-parseKeyword :: Parser CljVal
-parseKeyword = do
-  _ <- char ':'
-  x <- many1 (noneOf " :/")
-  return $ Keyword x
+parseComment :: Parser CljVal
+parseComment = do
+  _ <- char ';'
+  x <- many $ noneOf "\r\n"
+  return $ Comment x
 
 parseString' :: Parser String
 parseString' = do
@@ -114,21 +115,36 @@ parseName :: Parser String
 parseName = parseHead <:> (option "" $ many parseRest <++> (option "" $ char ';' <:> many1 parseRest))
   where
     parseHead :: Parser Char
-    parseHead = noneOf "0123456789^`'\"#~@:/%()[]{}\n\r\t \\,"
+    parseHead = noneOf "0123456789^`'\"#~@:/%()[]{}\n\r\t \\,;"
     parseRest :: Parser Char
     parseRest = parseHead <|> digit <|> char '.' <|> char '\''
 
 parseSymbol' :: Parser String
 parseSymbol' = try parseName <|> string "." <|> string "/"
 
+parseNsSymbol' :: Parser String
+parseNsSymbol' = try (parseName <++> string "/" <++> parseSymbol') <|> parseSymbol'
+
 parseSymbol :: Parser CljVal
 parseSymbol = do
-  x <- try (parseName <++> string "/" <++> parseSymbol') <|> parseSymbol'
+  x <- parseNsSymbol'
   return $ case x of
     "nil" -> Nil
     "true" -> Boolean True
     "false" -> Boolean False
     a -> Symbol a
+
+parseKeyword :: Parser CljVal
+parseKeyword = try parseNsKeyword' <|> parseKeyword'
+  where
+    parseKeyword' = do
+      _ <- char ':'
+      x <- parseNsSymbol'
+      return $ Keyword x
+    parseNsKeyword' = do
+      _ <- string "::"
+      x <- parseSymbol'
+      return $ Keyword x
 
 -- Data structures
 
@@ -262,6 +278,7 @@ parseTildes = try parseUnquoteSplice
 
 parseDef :: Parser CljVal
 parseDef = try parseNumber
+  <|> parseComment
   <|> parseSymbol
   <|> try parseGensym
   <|> parseString
