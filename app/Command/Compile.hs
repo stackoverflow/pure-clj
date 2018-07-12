@@ -8,12 +8,12 @@ import Prelude.Compat
 
 import qualified Options.Applicative as Opts
 
-import Clojure.Parser (parseClojure, checkForeign)
+import Clojure.Parser (parseClojure, hasForeign)
 import Control.Applicative (many)
 import Control.Monad
 import Data.Monoid ((<>))
 import Data.List (intercalate, isSuffixOf, sort)
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 import System.Directory
 import System.Exit (ExitCode(..))
 import System.FilePath ((</>), (<.>), takeDirectory, dropExtension)
@@ -70,7 +70,7 @@ processForeigns m@Module{..} inputDirs outDir =
     _ -> do
       let module' = runModuleNamePath moduleName
       globs <- mapM glob inputDirs
-      mods <- mapM (hasForeign m) $ concat globs
+      mods <- mapM (foreignExists m) $ concat globs
       let fpaths = foldl (\acc mb -> case mb of
                              Just fp -> acc ++ [fp]
                              Nothing -> acc) [] mods
@@ -91,17 +91,17 @@ processForeigns m@Module{..} inputDirs outDir =
       case parsed of
         Left e -> error $ "Could not parse foreign module " ++ mname ++ ":\n"  ++ (show e)
         Right cljs -> do
-          let foreigns = map (show . runIdent) moduleForeign
-              ffails = filter (not . checkForeign cljs) foreigns
+          let foreigns = map (unpack . runIdent) moduleForeign
+              ffails = filter (not . hasForeign cljs) foreigns
           case ffails of
             [] -> do let out = foldl (</>) outDir $ module' ++ ["_foreign.clj"]
                      putStrLn $ "Writing foreign " ++ out
                      writeStringOutput out content
-            fails -> error $ "Could not find foreign definitions " ++ (show fails)
+            fails -> error $ "Could not find foreign definitions: " ++ (intercalate " " fails)
                              ++ " for module " ++ mname
 
-hasForeign :: Module Ann -> FilePath -> IO (Maybe FilePath)
-hasForeign Module{..} input = do
+foreignExists :: Module Ann -> FilePath -> IO (Maybe FilePath)
+foreignExists Module{..} input = do
   let mn = runModuleNamePath moduleName
       foreignFile = foldl1 (</>) mn
       input' = dropExtension input

@@ -2,7 +2,7 @@
 
 module Clojure.Parser
   ( parseClojure
-  , checkForeign
+  , hasForeign
   , CljVal(..) ) where
 
 import Prelude.Compat
@@ -116,10 +116,10 @@ parseName = parseHead <:> (option "" $ many parseRest <++> (option "" $ char ';'
     parseHead :: Parser Char
     parseHead = noneOf "0123456789^`'\"#~@:/%()[]{}\n\r\t \\,"
     parseRest :: Parser Char
-    parseRest = parseHead <|> digit <|> char '.'
+    parseRest = parseHead <|> digit <|> char '.' <|> char '\''
 
 parseSymbol' :: Parser String
-parseSymbol' = string "." <|> string "/" <|> parseName
+parseSymbol' = try parseName <|> string "." <|> string "/"
 
 parseSymbol :: Parser CljVal
 parseSymbol = do
@@ -285,8 +285,8 @@ parseDefs = do
 parseClojure :: String -> Either ParseError [CljVal]
 parseClojure s = parse parseDefs "" s
 
-checkForeign :: [CljVal] -> String -> Bool
-checkForeign cljs foreign' = any (checkPubDef foreign') cljs
+hasForeign :: [CljVal] -> String -> Bool
+hasForeign cljs foreign' = any (checkPubDef foreign') cljs
   where
     isDef v = v == "def" || v == "defn"
 

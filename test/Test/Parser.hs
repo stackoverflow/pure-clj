@@ -33,7 +33,7 @@ checkForeignsDefined =
       parsed = parseClojure clj in
     case parsed of
       Left _ -> expectationFailure "Should have been parsed"
-      Right cljs -> let checker = checkForeign cljs in
+      Right cljs -> let checker = hasForeign cljs in
                       checker "x" && checker "y" && checker "z" `shouldBe` True
 
 checkForeignsNotDefined :: Expectation
@@ -42,5 +42,5 @@ checkForeignsNotDefined =
       parsed = parseClojure clj in
     case parsed of
       Left _ -> expectationFailure "Should have been parsed"
-      Right cljs -> let checker = checkForeign cljs in
+      Right cljs -> let checker = hasForeign cljs in
         checker "x" || checker "y" || checker "z" || checker "w" `shouldBe` False
