@@ -13,7 +13,7 @@ import PureClj.AST
 import PureClj.Optimizer.Common
 
 shouldInline :: Clj -> Bool
-shouldInline (CljVar _ _) = True
+shouldInline (CljVar Nothing _) = True
 shouldInline (CljNumericLiteral _) = True
 shouldInline (CljStringLiteral _) = True
 shouldInline (CljKeywordLiteral _) = True
@@ -109,8 +109,8 @@ inlineCommonOps = everywhereTopDown $ applyAll $
 
   , binary euclideanRingNumber opDiv Divide
 
-  , binary eqNumber opEq Equal
-  , binary eqNumber opNotEq NotEqual
+  -- , binary eqNumber opEq Equal       -- have to comment this because the way NaN works in Clojure
+  -- , binary eqNumber opNotEq NotEqual -- have to comment this because the way NaN works in Clojure
   , binary eqInt opEq Equal
   , binary eqInt opNotEq NotEqual
   , binary eqString opEq Equal
