@@ -70,15 +70,11 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
     addMain :: [Clj] -> [Clj]
     addMain defs | isMain mn && hasMain defs =
       let main = CljDef Top "-main" $
-                   CljFunction (Just "-main") ["& args"] [(CljApp (CljVar Nothing "main") [])]
+                   CljFunction (Just "-main") ["& args"] [(CljApp (CljVar Nothing "main") [CljVar Nothing "nil"])]
       in defs ++ [main]
     addMain defs = defs
 
     exprToClj :: Bool -> (Ann, Ident) -> Expr Ann -> m Clj
-    {-exprToClj _ (_, (Ident "main")) expr
-      | isMain mn = do
-          expr' <- valToClj expr
-          return $ CljDef Top "-main" $ CljFunction (Just "-main") ["& args"] (CljApp expr' [])-}
     exprToClj isTopLv (_, ident) expr = do
       let deft = if isTopLv then topType ident else LetDef
       expr' <- valToClj expr

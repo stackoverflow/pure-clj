@@ -97,9 +97,9 @@ parseNumber = do
     parseFloat = try infinity <|> try nan <|> plus <|> minus <|> number
       where
         number :: Parser String
-        number = (try numberFloat <|> int) <++> e
+        number = try (numberFloat <++> (option "" e)) <|> (int <++> e)
         numberFloat = int <++> ((char '.') <:> option "" int)
-        e = (option "" $ oneOf "eE" <:> (minusInt <|> int))
+        e = oneOf "eE" <:> (minusInt <|> int)
         plus = char '+' *> number
         minus = char '-' <:> number
         infinity :: Parser String
