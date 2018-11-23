@@ -109,8 +109,14 @@ inlineCommonOps = everywhereTopDown $ applyAll $
 
   , binary euclideanRingNumber opDiv Divide
 
-  -- , binary eqNumber opEq Equal       -- have to comment this because the way NaN works in Clojure
-  -- , binary eqNumber opNotEq NotEqual -- have to comment this because the way NaN works in Clojure
+  -- have to comment this because the way equals (=) works in Clojure
+  -- it short-circuits to true if the objects' reference are equals so
+  -- (= Double/NaN Double/NaN) -> false
+  -- but
+  -- (def nan Double/NaN)
+  -- (= nan nan) -> true
+  -- , binary eqNumber opEq Equal
+  -- , binary eqNumber opNotEq NotEqual
   , binary eqInt opEq Equal
   , binary eqInt opNotEq NotEqual
   , binary eqString opEq Equal
