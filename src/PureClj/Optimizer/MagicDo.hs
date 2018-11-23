@@ -31,10 +31,10 @@ magicDo'' effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   convert (CljApp (CljApp bind [m]) [CljFunction Nothing [_] [clj]]) | isDiscard bind =
     CljFunction (Just fnName) [] $ [(CljApp m []), CljApp clj []]
   -- Desugar bind
-  {-convert (CljApp (CljApp bind [m]) [CljFunction Nothing [arg] clj]) | isBind bind =
-    CljFunction (Just fnName) ["!!unused"] $ letDef arg (CljApp m []) (CljApp clj [])
+  convert (CljApp (CljApp bind [m]) [CljFunction Nothing [arg] [clj]]) | isBind bind =
+    CljFunction (Just fnName) [] $ [letDef arg (CljApp m []) (CljApp clj [])]
   -- Desugar untilE
-  convert (App s1 (App _ f [arg]) []) | isEffFunc C.untilE f =
+  {-convert (App s1 (App _ f [arg]) []) | isEffFunc C.untilE f =
     App s1 (Function s1 Nothing [] (Block s1 [ While s1 (Unary s1 Not (App s1 arg [])) (Block s1 []), Return s1 $ ObjectLiteral s1 []])) []
   -- Desugar whileE
   convert (App _ (App _ (App s1 f [arg1]) [arg2]) []) | isEffFunc C.whileE f =

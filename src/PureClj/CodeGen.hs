@@ -247,13 +247,15 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
 
     literalBinderToClj :: Text -> Literal (Binder Ann) -> m ([Clj], [Clj])
     literalBinderToClj varName (NumericLiteral n) =
-      return $ ([CljBinary Equal [(CljNumericLiteral n), (var' varName)]], [])
+      return ([CljBinary Equal [(CljNumericLiteral n), (var' varName)]], [])
     literalBinderToClj varName (StringLiteral s) =
-      return $ ([CljBinary Equal [(CljStringLiteral s), (var' varName)]], [])
+      return ([CljBinary Equal [(CljStringLiteral s), (var' varName)]], [])
     literalBinderToClj varName (CharLiteral c) =
-      return $ ([CljBinary Equal [(CljCharLiteral c), (var' varName)]], [])
+      return ([CljBinary Equal [(CljCharLiteral c), (var' varName)]], [])
     literalBinderToClj varName (BooleanLiteral b) =
-      return $ ([CljBinary Equal [(CljBooleanLiteral b), (var' varName)]], [])
+      return ([CljBinary Equal [(CljBooleanLiteral b), (var' varName)]], [])
+    literalBinderToClj varName (ArrayLiteral []) =
+      return ([CljBinary Equal [(CljArrayLiteral []), (var' varName)]], [])
     literalBinderToClj varName (ArrayLiteral bs) = do
       cljs <- zipWithM (arrayBinder varName) [0..] bs
       return $ fold cljs
@@ -273,6 +275,8 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
                             in [CljLet [CljDef LetDef newVar accessor] conds']
           return (let', def : cljs')
 
+    literalBinderToClj varName (ObjectLiteral []) =
+      return ([CljBinary Equal [(CljObjectLiteral []), (var' varName)]], [])
     literalBinderToClj varName (ObjectLiteral bs) = do
       cljs <- mapM (objBinder varName) bs
       return $ fold cljs
