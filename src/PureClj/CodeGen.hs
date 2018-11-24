@@ -195,7 +195,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
               let' = CljLet binds
           case ret of
             -- | in case of guards
-            Left ret' -> return $ (\(c, v) -> (cljAnd $ let' [c] : conds', let' [v])) <$> ret'
+            Left ret' -> return $ (\(c, v) -> (cljAnd $ conds' ++ [let' [c]], let' [v])) <$> ret'
             -- | no guards
             Right ret' -> return [(conds, let' [ret'])]
 
