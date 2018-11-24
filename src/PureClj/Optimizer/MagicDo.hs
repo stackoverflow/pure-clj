@@ -21,6 +21,7 @@ magicDo' = magicDo'' C.effect C.effectDictionaries
 magicDo'' :: Text -> C.EffectDictionaries -> Clj -> Clj
 magicDo'' effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   where
+  cljNil = CljVar Nothing "nil"
   -- The name of the function block which is added to denote a do block
   fnName = "__do"
   -- Desugar monomorphic calls to >>= and return for the Eff monad
@@ -29,10 +30,10 @@ magicDo'' effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   convert (CljApp (CljApp pure' [val]) []) | isPure pure' = val
   -- Desugar discard
   convert (CljApp (CljApp bind [m]) [CljFunction Nothing [_] [clj]]) | isDiscard bind =
-    CljFunction (Just fnName) [] $ [(CljApp m []), CljApp clj []]
+    CljFunction (Just fnName) ["&", "_"] $ [(CljApp m [cljNil]), CljApp clj [cljNil]]
   -- Desugar bind
   convert (CljApp (CljApp bind [m]) [CljFunction Nothing [arg] [clj]]) | isBind bind =
-    CljFunction (Just fnName) [] $ [letDef arg (CljApp m []) (CljApp clj [])]
+    CljFunction (Just fnName) ["&", "_"] $ [letDef arg (CljApp m [cljNil]) (CljApp clj [cljNil])]
   -- Desugar untilE
   {-convert (App s1 (App _ f [arg]) []) | isEffFunc C.untilE f =
     App s1 (Function s1 Nothing [] (Block s1 [ While s1 (Unary s1 Not (App s1 arg [])) (Block s1 []), Return s1 $ ObjectLiteral s1 []])) []
