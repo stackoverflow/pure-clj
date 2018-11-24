@@ -41,7 +41,7 @@ magicDo'' effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   convert (App _ (App _ (App s1 f [arg1]) [arg2]) []) | isEffFunc C.whileE f =
     App s1 (Function s1 Nothing [] (Block s1 [ While s1 (App s1 arg1 []) (Block s1 [ App s1 arg2 [] ]), Return s1 $ ObjectLiteral s1 []])) []-}
   -- Inline __do returns
-  convert (CljFunction name ps fb@(reverse -> ((CljApp (CljFunction (Just ident) _ body) []):_)))
+  convert (CljFunction name ps fb@(reverse -> ((CljApp (CljFunction (Just ident) _ body) _):_)))
     | ident == fnName = CljFunction name ps $ (butlast fb) ++ body
   -- Inline double applications
   {-convert (App _ (App s1 (Function s2 Nothing [] (Block ss body)) []) []) =
