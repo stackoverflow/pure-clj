@@ -8,6 +8,7 @@ import PureClj.AST
 import PureClj.Optimizer.Common
 import PureClj.Optimizer.Inliner
 import PureClj.Optimizer.MagicDo
+import PureClj.Optimizer.TCO (tco)
 
 optimize :: MonadSupply m => Clj -> m Clj
 optimize clj = do
@@ -15,7 +16,7 @@ optimize clj = do
                             . inlineUnsafePartial . tidyUp . applyAll
                             [ inlineCommonValues
                             , inlineCommonOps ]) clj
-  untilFixedPoint (return . tidyUp)
+  untilFixedPoint (return . tidyUp) . tco
     =<< untilFixedPoint (return . magicDo')
     =<< untilFixedPoint (return . magicDo) clj'
   where
