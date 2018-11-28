@@ -711,6 +711,7 @@ isBuiltIn name =
   -- | Java classes
   , "Object"
   , "Void"
+  , "Enum"
   ]
 
 -- | Checks if an operator exists in Clojure
