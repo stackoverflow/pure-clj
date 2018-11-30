@@ -44,6 +44,9 @@ inlineVariables :: Clj -> Clj
 inlineVariables = everywhere convert
   where
     convert :: Clj -> Clj
+    convert (CljVar Nothing "undefined") = CljVar Nothing "nil"
+    convert (CljApp (CljFunction _ [p] [(CljVar Nothing p')]) [_])
+      | p /= p' = CljVar Nothing p'
     convert (CljLet [] [v]) = v
     convert (CljLet [] vs) = CljApp (CljVar Nothing "do") vs
     convert (CljLet defs [v]) | any shouldInlineDef defs =
