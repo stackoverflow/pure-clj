@@ -42,14 +42,26 @@ tco = everywhere convert where
       && all allInTailPosition els
     allInTailPosition (CljIf cond the els) =
       countSelfReferences cond == 0 && allInTailPosition the && allInTailPosition els
+    allInTailPosition (CljArrayLiteral arr) = all ((== 0) . countSelfReferences) arr
+    allInTailPosition (CljArrayIndexer p1 p2) = countSelfReferences p1 == 0 && countSelfReferences p2 == 0
+    allInTailPosition (CljObjectLiteral kvs) = all ((== 0) . countSelfReferences) (map snd kvs)
+    allInTailPosition (CljAccessor _ obj) = countSelfReferences obj == 0
+    allInTailPosition (CljObjectUpdate obj kvs) = countSelfReferences obj == 0 && all ((== 0) . countSelfReferences) (map snd kvs)
+    allInTailPosition (CljUnary _ par) = countSelfReferences par == 0
+    allInTailPosition (CljBinary _ pars) = all ((== 0) . countSelfReferences) pars
+    allInTailPosition (CljBooleanLiteral _) = True
+    allInTailPosition (CljCharLiteral _) = True
+    allInTailPosition (CljKeywordLiteral _) = True
+    allInTailPosition (CljNumericLiteral _) = True
+    allInTailPosition (CljStringLiteral _) = True
     allInTailPosition (CljVar Nothing ident')
       | ident' == ident = False
       | otherwise = True
     allInTailPosition (CljThrow expr) =
       countSelfReferences expr == 0
-    allInTailPosition fnapp@(CljApp fn pars)
-      | isSelfCall ident fnapp = (sum $ map countSelfReferences (fn : pars)) == 1
-      | otherwise = (sum $ map countSelfReferences (fn : pars)) == 0
+    allInTailPosition fnapp@(CljApp _ _)
+      | isSelfCall ident fnapp = countSelfReferences fnapp == 1
+      | otherwise = countSelfReferences fnapp == 0
     allInTailPosition _ = False
 
   tcoify :: Text -> [Text] -> Clj -> Clj

@@ -32,6 +32,12 @@ isUsed var1 = everything (||) check
     check (CljVar Nothing var) | var1 == var = True
     check _ = False
 
+isUsedInFunction :: Text -> Clj -> Bool
+isUsedInFunction var1 = everything (||) check
+  where
+    check (CljFunction _ args body) = var1 `elem` args && any (isUsed var1) body
+    check _ = False
+
 isDict :: (Text, Text) -> Clj -> Bool
 isDict (moduleName, dictName) (CljVar (Just y) x) =
   x == dictName && y == moduleName
@@ -39,3 +45,13 @@ isDict _ _ = False
 
 isDict' :: [(Text, Text)] -> Clj -> Bool
 isDict' xs cljs = any (`isDict` cljs) xs
+
+removeFromLet :: ([Clj] -> [Clj] -> ([Clj], [Clj])) -> Clj -> Clj
+removeFromLet go (CljLet defs clj) =
+  let (defs', clj') = go defs clj
+  in go' defs' clj'
+  where
+    go' [] [v] = v
+    go' [] vs = (CljApp (CljVar Nothing "do") vs)
+    go' ds vs = (CljLet ds vs)
+removeFromLet _ clj = clj

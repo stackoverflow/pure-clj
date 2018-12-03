@@ -41,50 +41,25 @@ etaConvert = everywhere convert
     convert other = other
 
 inlineVariables :: Clj -> Clj
-inlineVariables = everywhere convert
+inlineVariables = everywhere $ removeFromLet go
   where
-    convert :: Clj -> Clj
-    convert (CljVar Nothing "undefined") = CljVar Nothing "nil"
-    convert (CljApp (CljFunction _ [p] [(CljVar Nothing p')]) [_])
-      | p /= p' = CljVar Nothing p'
-    convert (CljLet [] [v]) = v
-    convert (CljLet [] vs) = CljApp (CljVar Nothing "do") vs
-    convert (CljLet defs [v]) | any shouldInlineDef defs =
-      let reps = mkReplaces (checkReassigns defs v)
-          remains = mkRemains (map fst reps) defs
-          v' = foldl doReplace v (reverse reps)
-      in CljLet remains [v']
-      where
-        doReplace clj (var, rep) = replaceIdent var rep clj
-    convert other = other
-    mkReplaces :: [Clj] -> [(Text, Clj)]
-    mkReplaces [] = []
-    mkReplaces cljs = foldl (\m clj -> checkDef m clj) [] cljs
-      where
-        checkDef :: [(Text, Clj)] -> Clj -> [(Text, Clj)]
-        checkDef m (CljDef LetDef var v2@(CljVar Nothing var2)) | shouldInline v2 =
-          case lookup var2 m of
-            Just clj -> m ++ [(var, clj)]
-            Nothing -> m ++ [(var, v2)]
-        checkDef m (CljDef LetDef var clj) | shouldInline clj = m ++ [(var, clj)]
-        checkDef m _ = m
-    mkRemains :: [Text] -> [Clj] -> [Clj]
-    mkRemains vars defs = filter (go vars) defs
-      where
-        go :: [Text] -> Clj -> Bool
-        go vs (CljDef LetDef v _) = not $ elem v vs
-        go _ _ = True
-    checkReassigns :: [Clj] -> Clj -> [Clj]
-    checkReassigns [] _ = []
-    checkReassigns ((CljDef _ v _):vars) body | any (isReassigned v) (vars ++ [body]) =
-      checkReassigns vars body
-    checkReassigns (d@(CljDef _ _ _):vars) body = d : checkReassigns vars body
-    checkReassigns _ _ = error "Received non-def on checkReassigns"
+    go :: [Clj] -> [Clj] -> ([Clj], [Clj])
+    go [] clj = ([], clj)
+    go (CljDef LetDef var val : sts) clj
+      | shouldInline val && not (any (isReassigned var) (sts ++ clj)) =
+        let sts' = map (replaceIdent var val) sts
+            clj' = map (replaceIdent var val) clj
+        in go sts' clj'
+    go (s:sts) clj =
+      let (defs', clj') = go sts clj
+      in (s:defs', clj')
 
 inlineCommonValues :: Clj -> Clj
 inlineCommonValues = everywhere convert
   where
   convert :: Clj -> Clj
+  convert (CljVar Nothing "undefined") = CljVar Nothing C.nil
+  convert (CljLet defs [CljLet defs' body]) = CljLet (defs ++ defs') body
   convert (CljApp fn [dict])
     | isDict' [semiringNumber, semiringInt] dict && isDict fnZero fn = CljNumericLiteral (Left 0)
     | isDict' [semiringNumber, semiringInt] dict && isDict fnOne fn = CljNumericLiteral (Left 1)
@@ -237,7 +212,7 @@ inlineUnsafePartial = everywhereTopDown convert where
     = CljApp comp [ CljVar Nothing C.nil ]
   convert other = other
 
--- | work around Clojure lack of tail recursive lets
+-- | work around Clojure lack of recursive lets
 nameLets :: Clj -> Clj
 nameLets = everywhere name
   where
@@ -248,12 +223,13 @@ nameLets = everywhere name
     name x = x
     go :: [Clj] -> [Clj]
     go [] = []
-    go ((CljDef LetDef var clj) : defs) | isUsed var clj && shouldAtomize clj =
-      let atom = var <> "$atom" in
-      [ CljDef LetDef atom (CljApp (var' "atom") [(var' C.nil)])
-      , (CljDef LetDef var (replaceIdent var (var' $ "@" <> atom) clj))
-      , CljDef LetDef var (CljApp (var' "reset!") [var' atom, var' var])]
-      ++ go defs
+    go ((CljDef LetDef var clj) : defs)
+      | isUsed var clj && not (isUsedInFunction var clj) && shouldAtomize clj
+      = let atom = var <> "$atom" in
+          [ CljDef LetDef atom (CljApp (var' "atom") [(var' C.nil)])
+          , (CljDef LetDef var (replaceIdent var (var' $ "@" <> atom) clj))
+          , CljDef LetDef var (CljApp (var' "reset!") [var' atom, var' var])]
+          ++ go defs
     go others = others
     shouldAtomize :: Clj -> Bool
     shouldAtomize (CljFunction _ _ _) = False
@@ -261,7 +237,8 @@ nameLets = everywhere name
     var' :: Text -> Clj
     var' x = CljVar Nothing x
 
--- | simplify `cond`s moving to `if`s and `and`s removing useless clauses
+-- | simplify `cond`s moving to `if`s, `and`s removing useless clauses
+-- | and `str`s (string append)
 simplifyConds :: Clj -> Clj
 simplifyConds = everywhere go where
   go :: Clj -> Clj
@@ -273,6 +250,12 @@ simplifyConds = everywhere go where
       replaceAnds [] = []
       replaceAnds ((CljBinary And exprs):rest) = exprs ++ replaceAnds rest
       replaceAnds (x:rest) = x : replaceAnds rest
+  go (CljBinary StringAppend strs) | any isStr strs = CljBinary StringAppend $ replaceStr strs
+    where
+      replaceStr :: [Clj] -> [Clj]
+      replaceStr [] = []
+      replaceStr ((CljBinary StringAppend pars):rest) = pars ++ replaceStr rest
+      replaceStr (x:rest) = x : replaceStr rest
   go (CljCond [(CljBooleanLiteral True, expr)] _) = expr
   go (CljCond [(check, expr), (CljBooleanLiteral True, expr2)] _) = CljIf check expr expr2
   go other = other
@@ -282,6 +265,9 @@ simplifyConds = everywhere go where
   isAnd :: Clj -> Bool
   isAnd (CljBinary And _) = True
   isAnd _ = False
+  isStr :: Clj -> Bool
+  isStr (CljBinary StringAppend _) = True
+  isStr _ = False
 
 ringNumber :: forall a b. (IsString a, IsString b) => (a, b)
 ringNumber = (C.dataRing, C.ringNumber)
