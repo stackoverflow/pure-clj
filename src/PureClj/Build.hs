@@ -43,4 +43,4 @@ jsonToClj (path, content) =
     Success (_, m) -> do
       clj <- moduleToClj m
       return (m, clj)
-    Error e -> error $ "Failed to parse CoreFn: " ++ e
+    Error e -> error $ "Failed to parse CoreFn(" ++ path ++ "): " ++ e

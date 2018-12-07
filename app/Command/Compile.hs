@@ -12,8 +12,8 @@ import Clojure.Parser (parseClojure, hasForeign)
 import Control.Applicative (many)
 import Control.Monad
 import Data.Monoid ((<>))
-import Data.List (intercalate, isSuffixOf, sort)
-import Data.Text (Text, unpack)
+import Data.List (intercalate, isSuffixOf)
+import Data.Text (Text, unpack, replace, pack)
 import System.Directory
 import System.Exit (ExitCode(..))
 import System.FilePath ((</>), (<.>), takeDirectory, dropExtension)
@@ -78,11 +78,15 @@ processForeigns m@Module{..} inputDirs outDir =
         [] -> error $ "No foreign file found for module " ++ (intercalate "." module')
         [path] -> handleForeign path module'
         -- this is a rare case where one module
-        -- is a suffix of another. We take the shortest one
-        xs -> case sort xs of
-          (path:_) -> handleForeign path module'
-          _ -> error "Unreacheable code"
+        -- is a suffix of another.
+        xs -> handleForeign (chooseFittestModule modulePath xs) module'
   where
+    chooseFittestModule :: FilePath -> [FilePath] -> FilePath
+    chooseFittestModule mpath paths = case filter (== foreignPath) paths of
+      [] -> error "Absurd: bug in function `choosefittestmodule`"
+      (x:_) -> x
+      where
+        foreignPath = unpack $ replace ".purs" ".clj" (pack mpath)
     handleForeign :: FilePath -> [FilePath] -> IO ()
     handleForeign path module' = do
       content <- readFileUTF8asString path
