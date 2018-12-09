@@ -12,6 +12,7 @@ import Control.PatternArrows
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
+import Text.Printf (printf)
 
 import PureClj.AST
 import PureClj.Pretty.Common
@@ -32,14 +33,32 @@ prettyPrintSymbol s = foldMap encodeChar (T.unpack s)
   encodeChar c | c == '\\' = "\\\\"
   encodeChar c = T.singleton $ c
 
+prettyPrintChar :: Char -> Text
+prettyPrintChar '\n' = "newline"
+prettyPrintChar ' ' = "space"
+prettyPrintChar '\t' = "tab"
+prettyPrintChar '\f' = "formfeed"
+prettyPrintChar '\b' = "backspace"
+prettyPrintChar '\r' = "return"
+prettyPrintChar c = T.singleton c
+
+prettyPrintEscapedString :: [Int] -> Text
+prettyPrintEscapedString escapes = "\"" <> (foldMap escape escapes) <> "\""
+  where
+    escape :: Int -> Text
+    escape n = "\\u" <> (T.pack $ asHex n)
+    asHex :: Int -> String
+    asHex x = (printf "%04x" x)
+
 literals :: (Emit gen) => Pattern PrinterState Clj gen
 literals = mkPattern' match
   where
     match :: (Emit gen) => Clj -> StateT PrinterState Maybe gen
     match (CljNumericLiteral n) = return $ emit $ T.pack $ either show show n
-    match (CljStringLiteral s) = return $ emit $ prettyPrintString s
+    match (CljStringLiteral (Left s)) = return $ emit $ prettyPrintString s
+    match (CljStringLiteral (Right escapes)) = return $ emit $ prettyPrintEscapedString escapes
     match (CljKeywordLiteral k) = return $ emit $ ":" <> prettyPrintSymbol k
-    match (CljCharLiteral c) = return $ emit $ "\\" <> prettyPrintSymbol (T.singleton c)
+    match (CljCharLiteral c) = return $ emit $ "\\" <> prettyPrintChar c
     match (CljBooleanLiteral True) = return $ emit "true"
     match (CljBooleanLiteral False) = return $ emit "false"
     match (CljArrayLiteral arr) = mconcat <$> sequence

@@ -6,7 +6,7 @@ import Data.Text (Text)
 
 data Literal a
   = NumericLiteral (Either Int Double)
-  | StringLiteral Text
+  | StringLiteral (Either Text [Int])
   | CharLiteral Char
   | BooleanLiteral Bool
   | ArrayLiteral [a]

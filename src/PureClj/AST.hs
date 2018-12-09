@@ -60,7 +60,7 @@ data DefType
 
 data Clj
   = CljNumericLiteral (Either Int Double)
-  | CljStringLiteral Text
+  | CljStringLiteral (Either Text [Int])
   | CljKeywordLiteral Text
   | CljCharLiteral Char
   | CljBooleanLiteral Bool

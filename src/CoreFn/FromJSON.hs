@@ -84,12 +84,22 @@ literalFromJSON t = withObject "Literal" literalFromObj
     case type_ of
       "IntLiteral"      -> NumericLiteral . Left <$> o .: "value"
       "NumberLiteral"   -> NumericLiteral . Right <$> o .: "value"
-      "StringLiteral"   -> StringLiteral <$> o .: "value"
+      "StringLiteral"   -> parseStringLiteral o
       "CharLiteral"     -> CharLiteral <$> o .: "value"
       "BooleanLiteral"  -> BooleanLiteral <$> o .: "value"
       "ArrayLiteral"    -> parseArrayLiteral o
       "ObjectLiteral"   -> parseObjectLiteral o
       _                 -> fail ("error parsing Literal: " ++ show o)
+
+  parseStringLiteral :: Object -> Parser (Literal a)
+  parseStringLiteral o = do
+    val <- o .: "value"
+    go val
+    where
+      go (String s) = return $ StringLiteral (Left s)
+      go x = do
+        arr <- parseJSON x :: Parser ([Int])
+        return $ StringLiteral (Right arr)
 
   parseArrayLiteral o = do
     val <- o .: "value"

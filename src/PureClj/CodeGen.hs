@@ -176,7 +176,7 @@ moduleToClj (Module _ mn _ imps exps foreigns decls) = do
       valNames <- replicateM (length vals) freshName
       let letFn = CljLet (zipWith (CljDef LetDef) valNames vals)
           throw = CljThrow $ CljApp (var' "ex-info")
-            [ CljStringLiteral "Exhausted pattern matching"
+            [ CljStringLiteral (Left "Exhausted pattern matching")
             , CljObjectLiteral []]
       cljs <- forM binders (processBinder valNames)
       return $ letFn [CljCond (concat cljs) (Just throw)]
