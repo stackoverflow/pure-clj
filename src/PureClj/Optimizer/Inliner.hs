@@ -212,15 +212,17 @@ inlineUnsafePartial = everywhereTopDown convert where
     = CljApp comp [ CljVar Nothing C.nil ]
   convert other = other
 
+
+
 -- | work around Clojure lack of recursive lets
-nameLets :: Clj -> Clj
-nameLets = everywhere name
+fixLets :: Clj -> Clj
+fixLets = everywhere fix
   where
-    name :: Clj -> Clj
-    name (CljDef LetDef var (CljFunction Nothing pars [body])) | isUsed var body && not (var `elem` pars) =
+    fix :: Clj -> Clj
+    fix (CljDef LetDef var (CljFunction Nothing pars [body])) | isUsed var body && not (var `elem` pars) =
       CljDef LetDef var (CljFunction (Just var) pars [body])
-    name (CljLet defs [v]) = CljLet (go defs) [v]
-    name x = x
+    fix (CljLet defs [v]) = CljLet (go defs) [v]
+    fix x = x
     go :: [Clj] -> [Clj]
     go [] = []
     go ((CljDef LetDef var clj) : defs)

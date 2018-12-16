@@ -129,6 +129,16 @@ withIndent action = do
   return result
 
 -- |
+-- Pretty print with a specified indentation level
+--
+withSomeIndent :: Int -> StateT PrinterState Maybe gen -> StateT PrinterState Maybe gen
+withSomeIndent amount action = do
+  modify $ \st -> st { indent = indent st + amount }
+  result <- action
+  modify $ \st -> st { indent = indent st - amount }
+  return result
+
+-- |
 -- Get the current indentation level
 --
 currentIndent :: (Emit gen) => StateT PrinterState Maybe gen

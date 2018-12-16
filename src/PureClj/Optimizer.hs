@@ -22,7 +22,7 @@ optimize clj = do
   where
     tidyUp :: Clj -> Clj
     tidyUp = applyAll $
-      [ nameLets
+      [ fixLets
       , etaConvert
       , simplifyConds
       , inlineVariables

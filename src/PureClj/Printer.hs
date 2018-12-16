@@ -68,18 +68,18 @@ literals = mkPattern' match
       ]
     match (CljObjectLiteral []) = return $ emit "{}"
     match (CljObjectLiteral ps) = mconcat <$> sequence
-      [ return $ emit "{\n"
-      , withIndent $ do
+      [ return $ emit "{"
+      , withSomeIndent 1 $ do
           entries <- forM ps $ \(key, value) -> fmap ((keyToStr key <> emit " ") <>) . prettyPrintClj' $ value
           indentString <- currentIndent
-          return $ intercalate (emit ",\n") $ map (indentString <>) (entries <> [emit "}"])
+          return $ (intercalate (emit ",\n" <> indentString) $ entries) <> emit "}"
       ]
     match (CljVar (Just mn) name) = return $ emit mn <> emit "/" <> emit name
     match (CljVar Nothing name) = return $ emit name
     match (CljDeclare idents) = return $ emit ("(declare " <> (intercalate " " idents) <> ")")
     match (CljDef LetDef ident val) = mconcat <$> sequence
       [ return $ emit (ident <> " ")
-      , prettyPrintClj' val
+      , withIndentPrettyPrintClj' (T.length ident + 1) val
       ]
     match (CljDef deft ident val) = mconcat <$> sequence
       [ return $ emit $ "(def " <> (visibility deft) <> ident <> "\n"
@@ -97,11 +97,11 @@ literals = mkPattern' match
         visibility TopPvt = "^:private "
         visibility _ = ""
     match (CljLet binds rets) = mconcat <$> sequence
-      [ return $ emit "(let\n"
-      , withIndent $ do
+      [ return $ emit "(let ["
+      , withSomeIndent 6 $ do
           entries <- forM binds prettyPrintClj'
           ind <- currentIndent
-          return $ ind <> emit "[" <> (intercalate (emit "\n" <> ind <> emit " ") entries)
+          return $ intercalate (emit "\n" <> ind <> emit " ") entries
       , return $ emit "]\n"
       , withIndent $ do
           rets' <- forM rets prettyPrintClj'
@@ -111,8 +111,8 @@ literals = mkPattern' match
       ]
     match (CljCond conds el) = mconcat <$> sequence
       [ return $ emit "(cond\n"
-      , intercalate (emit "\n") <$> forM conds printCond
-      , return $ emit "\n"
+      , intercalate (emit "\n\n") <$> forM conds printCond
+      , return $ emit "\n\n"
       , maybe (return mempty) (\el' -> printCond (CljKeywordLiteral "else", el')) el
       , return $ emit ")"
       ]
@@ -122,10 +122,10 @@ literals = mkPattern' match
           check' <- prettyPrintClj' check
           val' <- prettyPrintClj' val
           identString <- currentIndent
-          return $ identString <> check' <> emit " " <> val'
+          return $ identString <> check' <> emit "\n" <> identString <> val'
     match (CljIf cond then' else') = mconcat <$> sequence
       [ return $ emit "(if "
-      , prettyPrintClj' cond
+      , withIndentPrettyPrintClj' 4 cond
       , return $ emit "\n"
       , printIndented then'
       , return $ emit "\n"
@@ -166,6 +166,7 @@ literals = mkPattern' match
       clj' <- prettyPrintClj' clj
       indentStr <- currentIndent
       return $ indentStr <> clj'
+    withIndentPrettyPrintClj' amount clj = withSomeIndent amount $ prettyPrintClj' clj
 
 accessor :: Pattern PrinterState Clj (Text, Clj)
 accessor = mkPattern match
@@ -195,6 +196,10 @@ app = mkPattern' match
   match (CljUnary BitwiseNot val) = do
     cljs <- traverse prettyPrintClj' [val]
     return (intercalate (emit " ") cljs, CljVar Nothing "bit-not")
+  match (CljBinary And vals) = do
+    cljs <- traverse (\clj -> withSomeIndent 5 $ prettyPrintClj' clj) vals
+    ind <- currentIndent
+    return (intercalate (emit "\n" <> ind <> emit "     ") cljs, CljVar Nothing "and")
   match (CljBinary op vals) = do
     cljs <- traverse prettyPrintClj' vals
     return (intercalate (emit " ") cljs, CljVar Nothing (binaryTable op))

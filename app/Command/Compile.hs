@@ -13,7 +13,7 @@ import Control.Applicative (many)
 import Control.Monad
 import Data.Monoid ((<>))
 import Data.List (intercalate, isSuffixOf)
-import Data.Text (Text, unpack, replace, pack)
+import Data.Text (Text, unpack)
 import System.Directory
 import System.Exit (ExitCode(..))
 import System.FilePath ((</>), (<.>), takeDirectory, dropExtension)
@@ -86,7 +86,7 @@ processForeigns m@Module{..} inputDirs outDir =
       [] -> error "Absurd: bug in function `choosefittestmodule`"
       (x:_) -> x
       where
-        foreignPath = unpack $ replace ".purs" ".clj" (pack mpath)
+        foreignPath = dropExtension mpath <.> "clj"
     handleForeign :: FilePath -> [FilePath] -> IO ()
     handleForeign path module' = do
       content <- readFileUTF8asString path
