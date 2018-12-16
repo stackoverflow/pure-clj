@@ -212,17 +212,43 @@ inlineUnsafePartial = everywhereTopDown convert where
     = CljApp comp [ CljVar Nothing C.nil ]
   convert other = other
 
-
-
--- | work around Clojure lack of recursive lets
+-- | work around Clojure lack of mutuably/forward referenced variables in let
 fixLets :: Clj -> Clj
 fixLets = everywhere fix
   where
     fix :: Clj -> Clj
-    fix (CljDef LetDef var (CljFunction Nothing pars [body])) | isUsed var body && not (var `elem` pars) =
-      CljDef LetDef var (CljFunction (Just var) pars [body])
-    fix (CljLet defs [v]) = CljLet (go defs) [v]
+    fix (CljLet defs body) = CljLet (go (collectDefs defs)) body
     fix x = x
+    go :: [(Text, Clj)] -> [Clj]
+    go [] = []
+    go ((_, CljDef LetDef ident clj):xs)
+      | any (flip isUsed $ clj) (map fst xs)
+      = let replaces = filter (flip isUsed $ clj) (map fst xs)
+            atom name = CljDef LetDef (name <> "$atom") (CljApp (CljVar Nothing "atom") [CljVar Nothing "nil"])
+            body = foldl (\clj' var -> replaceIdent var (CljVar Nothing ("@" <> var <> "$atom")) clj') clj replaces
+            addedAtoms = foldl (\pairs' var -> resetAtom pairs' var) xs replaces
+        in (map atom replaces) ++ [CljDef LetDef ident body] ++ go addedAtoms
+    go (x:xs) = snd x : go xs
+    collectDefs :: [Clj] -> [(Text, Clj)]
+    collectDefs [] = []
+    collectDefs (clj@(CljDef LetDef ident _):xs) = (ident, clj) : collectDefs xs
+    collectDefs _ = error "Received non let definition in a let bind"
+    resetAtom :: [(Text, Clj)] -> Text -> [(Text, Clj)]
+    resetAtom [] _ = []
+    resetAtom (clj@(_, (CljDef LetDef ident _)):xs) var
+      | var == ident
+      = clj : ("$$unused", (CljDef LetDef "_" (CljApp (CljVar Nothing "reset!") [CljVar Nothing (var <> "$atom"), CljVar Nothing var]))) : xs
+    resetAtom (x:xs) var = x : resetAtom xs var
+
+-- | work around Clojure lack of recursive lets
+nameLets :: Clj -> Clj
+nameLets = everywhere name
+  where
+    name :: Clj -> Clj
+    name (CljDef LetDef var (CljFunction Nothing pars [body])) | isUsed var body && not (var `elem` pars) =
+      CljDef LetDef var (CljFunction (Just var) pars [body])
+    name (CljLet defs [v]) = CljLet (go defs) [v]
+    name x = x
     go :: [Clj] -> [Clj]
     go [] = []
     go ((CljDef LetDef var clj) : defs)
