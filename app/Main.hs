@@ -32,7 +32,7 @@ main = do
 
     versionInfo :: Opts.Parser (a -> a)
     versionInfo = Opts.abortOption (Opts.InfoMsg version) $
-      Opts.long "version" <> Opts.help "Show the version number" <> Opts.hidden
+      Opts.long "version" <> Opts.short 'v' <> Opts.help "Show the version number" <> Opts.hidden
 
     execParserPure :: Opts.ParserInfo a -> [String] -> Opts.ParserResult a
     execParserPure pinfo [] = Opts.Failure $

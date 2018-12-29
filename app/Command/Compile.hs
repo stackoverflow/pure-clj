@@ -33,6 +33,7 @@ data PurscljMakeOptions = PurscljMakeOptions
   , pcljPursOutputDir :: FilePath
   , pcljOutputDir     :: FilePath
   , pcljJSONErrors    :: Bool
+  , pcljVerbose       :: Bool
   }
 
 compile :: PurscljMakeOptions -> IO ()
@@ -59,12 +60,13 @@ compileClj PurscljMakeOptions{..} = do
   forM_ cljs $ \(module', clj) -> do
     let mn = (runModuleNamePath $ moduleName module') ++ ["_core.clj"]
         file = foldl (</>) pcljOutputDir mn
-    processForeigns module' pcljInput pcljOutputDir
-    putStrLn $ "Writing " ++ (intercalate "." mn)
+    processForeigns module' pcljInput pcljOutputDir pcljVerbose
+    when pcljVerbose $
+      putStrLn $ "Writing " ++ (intercalate "." mn)
     writeOutput file clj
 
-processForeigns :: Module Ann -> [FilePath] -> FilePath -> IO ()
-processForeigns m@Module{..} inputDirs outDir =
+processForeigns :: Module Ann -> [FilePath] -> FilePath -> Bool -> IO ()
+processForeigns m@Module{..} inputDirs outDir verbose =
   case moduleForeign of
     [] -> return ()
     _ -> do
@@ -83,7 +85,7 @@ processForeigns m@Module{..} inputDirs outDir =
   where
     chooseFittestModule :: FilePath -> [FilePath] -> FilePath
     chooseFittestModule mpath paths = case filter (== foreignPath) paths of
-      [] -> error "Absurd: bug in function `choosefittestmodule`"
+      [] -> error "Absurd: bug in function `chooseFittestModule`"
       (x:_) -> x
       where
         foreignPath = dropExtension mpath <.> "clj"
@@ -99,7 +101,8 @@ processForeigns m@Module{..} inputDirs outDir =
               ffails = filter (not . hasForeign cljs) foreigns
           case ffails of
             [] -> do let out = foldl (</>) outDir $ module' ++ ["_foreign.clj"]
-                     putStrLn $ "Writing foreign " ++ out
+                     when verbose $
+                       putStrLn $ "Writing foreign " ++ out
                      writeStringOutput out content
             fails -> error $ "Could not find foreign definitions: " ++ (intercalate " " fails)
                              ++ " for module: " ++ mname ++ " path: " ++ path
@@ -171,6 +174,12 @@ jsonErrors = Opts.switch $
      Opts.long "json-errors"
   <> Opts.help "Print purs errors to stderr as JSON"
 
+verbose :: Opts.Parser Bool
+verbose = Opts.switch $
+     Opts.long "verbose"
+  <> Opts.short 'v'
+  <> Opts.help "Verbose output"
+
 purscljMakeOptions :: Opts.Parser PurscljMakeOptions
 purscljMakeOptions =
       PurscljMakeOptions
@@ -178,6 +187,7 @@ purscljMakeOptions =
   <*> pursOutputDirectory
   <*> outputDirectory
   <*> jsonErrors
+  <*> verbose
 
 command :: Opts.Parser (IO ())
 command = compile <$> (Opts.helper <*> purscljMakeOptions)
