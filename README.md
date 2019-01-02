@@ -1,6 +1,6 @@
 # pure-clj (Purescript Clojure backend)
 
-A small strongly typed programming language with expressive types that compiles to JavaScript, written in and inspired by Haskell.
+A small strongly typed programming language with expressive types that compiles to ~~JavaScript~~ Clojure, written in and inspired by Haskell.
 
 This is not a fork of the compiler, but a different compiler that translates purescript corefn output to Clojure.
 
@@ -33,11 +33,11 @@ Now you can use `lein pursclj` to compile your Purescript project to Clojure and
 | `Int` | `long` | 64 bits Java long |
 | `Boolean` | `boolean` | |
 | `String` | `String` | |
-| `Array` | `clojure.lang.PersistentVector` | Fully persistent and immutable unlike the Javascript version |
-| Records | `clojure.lang.PersistentArrayMap` | Fully persistent and immutable unlike the Javascript version |
+| `Array` | `clojure.lang.PersistentVector` | Compiles to Clojure's persistent vectors |
+| Records | `clojure.lang.PersistentArrayMap` | Compiles to Clojure's persistent maps |
 | Tagged Union | Clojure `defrecord` | |
 | Newtype | as underlying type | |
-| Functions | Clojure functions curried | `foo a b = ...` -> `(defn foo [a] (fn [b] ...))` |
+| Functions | Clojure functions curried | `foo a b = ...` -> `(def foo (fn [a] (fn [b] ...)))` |
 
 ## FFI
 
